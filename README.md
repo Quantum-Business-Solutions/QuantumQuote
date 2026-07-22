@@ -1,70 +1,73 @@
-# QuantumQuote
+# Welcome to your Lovable project
 
-A HubSpot-native **copier / office-equipment CPQ** — QBS's own configure-price-quote engine (an alternative to KeyPoint's Quote IQ) so we control the quoting process and keep the recurring revenue.
+## Project info
 
-> **Principle:** HubSpot is the system of record; the app is the engine.
-> The catalog and the signed deal live natively in HubSpot; the compatibility
-> rules, pricing, leasing math, and proposal generation live in the app.
+**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
-## v1 scope
+## How can I edit this code?
 
-One job: **configure a copier deal → price it → push it to HubSpot as a Deal with line items → get it signed.** Current-state / renewal / ERP-ingestion (installed base, leases, competitive takeout) is deliberately **phase 2**.
+There are several ways of editing your application.
 
-## What's in this repo
+**Use Lovable**
 
-```
-prototype/configurator.html      Interactive prototype — the target UX (open in a browser)
-docs/data-model.html             Data model, flow, and "what's where" across portals
-docs/engineering-review.html     Review brief (design decisions + open questions)
-hubspot/
-  properties/product.properties.json      cpq_* flags, costs, manufacturer/model, category
-  properties/line_item.properties.json    line_role + machine_group (grouping)
-  schemas/product_association.schema.json  the rules custom object
-  seed/products.json                       real Canon catalog seed
-  seed/product-associations.rules.json     compatibility rules (requires/excludes/one_of/default)
-scripts/provision-portal.sh       Stands the whole data model up in a portal via PAT
-```
+Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
 
-## Data model (the four objects that matter)
+Changes made via Lovable will be committed automatically to this repo.
 
-| Object | Where | Role |
-|---|---|---|
-| `product` | HubSpot native | Price book + `cpq_*` control flags + `rep_floor_cost` |
-| `product_association` | HubSpot custom object | Compatibility **rules** (`rule_type`, `group_id`, qty) — synced to the app for evaluation |
-| `quote_configurations` | App (Supabase) | The live build + commercial terms (JSONB) |
-| `line_item` | HubSpot native | Resolved output, **grouped by machine** via `machine_group` + `line_role` |
+**Use your preferred IDE**
 
-## Key finding (verified live in a demo portal)
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-**HubSpot allows no programmatic line-item → line-item association.** Native
-Parent/Child types are read-only (reserved for its bundle feature) and custom
-labels are disallowed between line items (`allowsCustomLabels=false`). So the
-machine → options tree is expressed with a **grouping property**
-(`machine_group` + `line_role`), *not* an association. This is what the app's
-writeback sets.
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Also: newly-created HubSpot properties take ~a couple minutes to propagate
-before writes stick — relevant for any provisioning/writeback code.
+Follow these steps:
 
-## Provision a portal
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
 
-```bash
-export HUBSPOT_TOKEN="pat-..."      # a HubSpot private-app token (never commit this)
-./scripts/provision-portal.sh
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
+
+# Step 3: Install the necessary dependencies.
+npm i
+
+# Step 4: Start the development server with auto-reloading and an instant preview.
+npm run dev
 ```
 
-Creates the properties, the `product_association` object, seeds the Canon
-catalog, and loads the compatibility rules. Idempotent-ish (existing objects
-409 and are skipped).
+**Edit a file directly in GitHub**
 
-## Build path
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
 
-- **Already built** (in the existing QBS document app): HubSpot OAuth + read/write, line-item writeback, quote versions/templates, leasing rate-card engine, pricing tiers, document generation, field mappings, roles, multi-tenant settings.
-- **Extend:** standardize `cpq_*` flags + rep/dealer cost; add dynamic pricing rules.
-- **Net-new:** rule fields on `product_association` + the guided-selling **configurator UI** and its rules-evaluation engine (see `prototype/configurator.html`).
+**Use GitHub Codespaces**
 
-## The configurator interface
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
 
-The UX lives as a module inside the existing QBS app (Lovable + React + Supabase,
-embedded on the HubSpot deal via OAuth) — not a separate new app. The
-`prototype/configurator.html` here is the design reference for that module.
+## What technologies are used for this project?
+
+This project is built with:
+
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
+
+## How can I deploy this project?
+
+Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+
+## Can I connect a custom domain to my Lovable project?
+
+Yes, you can!
+
+To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+
+Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
