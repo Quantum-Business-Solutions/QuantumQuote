@@ -10,6 +10,21 @@ A HubSpot-native **copier / office-equipment CPQ** — QBS's own configure-price
 
 One job: **configure a copier deal → price it → push it to HubSpot as a Deal with line items → get it signed.** Current-state / renewal / ERP-ingestion (installed base, leases, competitive takeout) is deliberately **phase 2**.
 
+## Shipped in the live app (as of Jul 23 2026)
+
+The production app is **`Quantum-Business-Solutions/quotecommand-0958c73e`** (Lovable-connected). Everything below is built, build-verified, and on `main`:
+
+- **Configurator** `/configurator`: rules engine (required / default / choose-one / dependencies / qty limits / excludes), real margins from `rep_floor_cost` with sell-price lift lever, payment-first quoting ("quote to a payment"), live lease rate cards (funder + program + amount band), trade-up buyout (Tascosa formula chain), fleet templates + CSV fleet import + duplicate machine, per-machine locations, volume duty-cycle warnings, auto fleet discounts (2/4/6% @ 5/10/25 units), tiered overage bands, partial pooling groups, service term independent of lease, machine comparison, config-validity gate, demo mode, first-run tour, tablet-friendly.
+- **Round-trip**: live HubSpot price book in; grouped line items out (`machine_group` + `line_role`); deal writeback (`amount`, `cpq_lease_monthly_payment`, `cpq_service_monthly_total`, `cpq_blended_margin`, `cpq_approval_status`, buyout inputs).
+- **Guardrails**: blended margin < 20% or below-floor → `hubspot-approval-task` creates an owner-assigned HubSpot task and flags the deal pending.
+- **Renewal pipeline**: every pushed lease seeds the future upgrade deal (lease-end − 6 mo) via `hubspot-renewal-seed`, idempotent.
+- **Proposals**: branded customer PDF (margin structurally excluded), good/better/best option snapshots, editable exec summary, lease-vs-cash comparison, 30-day validity.
+- **Drafts & versions**: `quote-versions`-backed save/restore with resume-draft prompt; every push/approval auto-snapshots.
+- **Admin** `/admin/cpq` + `/admin/onboarding`: rules editor, lift-% pricing (rep floor = dealer cost × (1 + lift)), discount authority by role, rate-sheet management, guided dealer onboarding checklist.
+- **Analytics** `/analytics`: margin KPIs + histogram, by-rep table, win/loss with reasons, renewals radar, quote audit feed.
+
+This planning repo remains the design source (schemas, seeds, provisioning script, pricing one-pager in `business/`).
+
 ## What's in this repo
 
 ```
