@@ -1,0 +1,82 @@
+project_id = "REPLACE_WITH_YOUR_SUPABASE_PROJECT_ID"
+
+[functions.hubspot-oauth-callback]
+verify_jwt = false
+
+[functions.hubspot-get-deal]
+verify_jwt = false
+
+[functions.dealer-account-get]
+verify_jwt = false
+
+[functions.dealer-account-save]
+verify_jwt = false
+
+[functions.hubspot-attach-file]
+verify_jwt = false
+
+[functions.hubspot-update-deal]
+verify_jwt = false
+
+[functions.upload-rate-sheet]
+verify_jwt = false
+
+[functions.get-rate-factors]
+verify_jwt = false
+
+[functions.get-configuration]
+verify_jwt = false
+
+[functions.save-configuration]
+verify_jwt = false
+
+[functions.get-configurations-bulk]
+verify_jwt = false
+
+[functions.migrate-hubspot-tokens]
+verify_jwt = false
+
+[functions.hubspot-get-properties]
+verify_jwt = false
+
+[functions.custom-document-save]
+verify_jwt = false
+
+[functions.field-mappings-save]
+verify_jwt = false
+
+[functions.hubspot-get-owners]
+verify_jwt = false
+
+[functions.pricing-tiers-get]
+verify_jwt = false
+
+[functions.pricing-tiers-save]
+verify_jwt = false
+
+[functions.hubspot-get-products]
+verify_jwt = false
+
+[functions.hubspot-sync-line-items]
+verify_jwt = false
+
+[functions.product-type-override-save]
+verify_jwt = false
+
+[functions.quote-versions]
+verify_jwt = false
+
+[functions.hubspot-create-product]
+verify_jwt = false
+
+[functions.quote-templates]
+verify_jwt = false
+
+[functions.app-feedback]
+verify_jwt = false
+
+[functions.hubspot-get-equipment]
+verify_jwt = false
+
+[functions.mcp]
+verify_jwt = false

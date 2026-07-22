@@ -1,0 +1,6034 @@
+import { useState, useRef, useCallback, useEffect, lazy, Suspense } from "react";
+
+type TimerId = ReturnType<typeof setTimeout>;
+import { HubSpotProvider, useHubSpot } from "@/hooks/useHubSpot";
+import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "sonner";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { PDFDocument } from "pdf-lib";
+import {
+  FileText,
+  ClipboardList,
+  FileCheck,
+  FileSpreadsheet,
+  Receipt,
+  MailOpen,
+  MapPin,
+  UserPlus,
+  Truck,
+  Trash2,
+  Building2,
+  User,
+  Package,
+  Loader2,
+  Settings,
+  UserCircle,
+  Download,
+  Eye,
+  Save,
+  FileSignature,
+  Calculator,
+  BookTemplate,
+  FolderOpen,
+  MessageSquarePlus,
+  Bug,
+  Lightbulb,
+  CheckCircle2,
+  Clock,
+  X,
+  AlertCircle,
+  Search,
+  PanelLeftOpen,
+  PanelLeftClose,
+} from "lucide-react";
+import { QuoteForm, QuoteFormData } from "@/components/quote/QuoteForm";
+import { QuotePreview } from "@/components/quote/QuotePreview";
+import { SummaryRail, type SummaryMetric } from "@/components/shared";
+import { quantumLogo } from "@/assets/quantumLogo";
+import { InstallationForm, InstallationFormData } from "@/components/installation/InstallationForm";
+import { InstallationPreview } from "@/components/installation/InstallationPreview";
+import { ServiceAgreementForm, ServiceAgreementFormData } from "@/components/service-agreement/ServiceAgreementForm";
+import { ServiceAgreementPreview } from "@/components/service-agreement/ServiceAgreementPreview";
+import { FMVLeaseForm, FMVLeaseFormData } from "@/components/fmv-lease/FMVLeaseForm";
+import { FMVLeasePreview } from "@/components/fmv-lease/FMVLeasePreview";
+import { LeaseFundingForm, LeaseFundingFormData } from "@/components/lease-funding/LeaseFundingForm";
+import { LeaseFundingPreview } from "@/components/lease-funding/LeaseFundingPreview";
+import { LeaseReturnForm, LeaseReturnFormData } from "@/components/lease-return/LeaseReturnForm";
+import { LeaseReturnPreview } from "@/components/lease-return/LeaseReturnPreview";
+import { LoiForm, LoiFormData } from "@/components/loi/LoiForm";
+import { LoiPreview } from "@/components/loi/LoiPreview";
+import { InterterritorialForm, InterterritorialFormData } from "@/components/interterritorial/InterterritorialForm";
+import { InterterritorialPreview } from "@/components/interterritorial/InterterritorialPreview";
+import { NewCustomerForm, NewCustomerFormData } from "@/components/new-customer/NewCustomerForm";
+import { NewCustomerPreview } from "@/components/new-customer/NewCustomerPreview";
+import RelocationForm, {
+  RelocationFormData,
+  getDefaultRelocationFormData,
+} from "@/components/relocation/RelocationForm";
+import RelocationPreview from "@/components/relocation/RelocationPreview";
+import { RemovalForm, RemovalFormData, getDefaultRemovalFormData } from "@/components/removal/RemovalForm";
+import { RemovalPreview } from "@/components/removal/RemovalPreview";
+import {
+  CommissionForm,
+  CommissionFormData,
+  getDefaultCommissionFormData,
+} from "@/components/commission/CommissionForm";
+import { CommissionPreview } from "@/components/commission/CommissionPreview";
+import { CustomDocumentForm, CustomDocumentPreview, DynamicIcon } from "@/components/custom-document";
+import type { CustomDocument } from "@/components/admin/types";
+import type { FormCustomizationConfig, FormCustomizationMap } from "@/lib/formCustomization";
+import { DocumentPacketForm } from "@/components/document-packet/DocumentPacketForm";
+const AdminSettings = lazy(() => import("@/pages/admin/AdminSettings"));
+
+const documentTypes = [
+  { code: "quote", name: "Quote", icon: FileText },
+  { code: "installation", name: "Installation", icon: ClipboardList },
+  { code: "service_agreement", name: "Service Agreement", icon: FileCheck },
+  { code: "fmv_lease", name: "FMV Lease", icon: FileSpreadsheet },
+  { code: "lease_funding", name: "Lease Funding", icon: Receipt },
+  { code: "loi", name: "Letter of Intent", icon: FileSignature },
+  { code: "lease_return", name: "Lease Return", icon: MailOpen },
+  { code: "interterritorial", name: "Interterritorial", icon: MapPin },
+  { code: "new_customer", name: "New Customer", icon: UserPlus },
+  { code: "relocation", name: "Relocation", icon: Truck },
+  { code: "equipment_removal", name: "Removal", icon: Trash2 },
+  { code: "commission", name: "Commission", icon: Calculator },
+];
+
+interface DealerInfo {
+  companyName: string;
+  address: string;
+  phone: string;
+  website: string;
+  logoUrl?: string;
+  termsAndConditions?: string;
+}
+
+interface DealerSettings {
+  meter_methods?: string[];
+  cca_value?: string;
+  enabled_forms?: string[];
+  document_styles?: {
+    fontFamily?: string;
+    fontColor?: string;
+    tableBorderColor?: string;
+    tableLineColor?: string;
+    fontSizeOffset?: number;
+    fontSizeOffsets?: {
+      title?: number;
+      header?: number;
+      body?: number;
+      table?: number;
+      fine?: number;
+    };
+  };
+  proposal_template_url?: string;
+  proposal_template_name?: string;
+  form_customization?: FormCustomizationMap;
+}
+
+interface DocumentTerms {
+  [key: string]: string;
+}
+
+// Auto-save debounce delay in milliseconds
+const AUTO_SAVE_DELAY = 3000;
+
+function DocumentHubContent() {
+  const {
+    deal,
+    company,
+    contacts,
+    lineItems,
+    dealOwner,
+    labeledContacts,
+    companyContacts,
+    properties,
+    loading,
+    error,
+    portalId,
+    userId,
+  } = useHubSpot();
+
+  // User permissions
+  const [userPermissions, setUserPermissions] = useState<{
+    role: string;
+    can_view: boolean;
+    can_edit: boolean;
+    can_download: boolean;
+    can_generate: boolean;
+    is_admin: boolean;
+    reason: string;
+  }>({
+    role: "user",
+    can_view: true,
+    can_edit: true,
+    can_download: true,
+    can_generate: true,
+    is_admin: false,
+    reason: "loading",
+  });
+
+  // Whether the in-place (in-iframe) admin settings view is open
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Fetch user permissions when deal loads
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      if (!portalId || !userId) return;
+      try {
+        const { data, error: permError } = await supabase.functions.invoke("get-user-access", {
+          body: {
+            portalId,
+            userId,
+            dealStage: deal?.properties?.dealstage || deal?.stage || "",
+            pipelineId: deal?.properties?.pipeline || deal?.pipeline || "",
+          },
+        });
+        if (!permError && data) {
+          setUserPermissions(data);
+        }
+      } catch {
+        console.warn("Failed to fetch user permissions, defaulting to full access");
+      }
+    };
+    fetchPermissions();
+  }, [portalId, userId, deal?.properties?.dealstage, deal?.properties?.pipeline]);
+
+  // Stamp "Last Time App Used" on the deal.
+  // Fully isolated and non-blocking by design: this writes ONLY the
+  // last_time_app_used property in its own PATCH. If that property does not
+  // exist in a given portal (or the call otherwise fails), the error is
+  // swallowed and can never affect the real deal update (amount/financing/etc).
+  const pushLastAppActivity = useCallback(async () => {
+    const currentPortalId = portalId || localStorage.getItem("hs_portal_id");
+    const dealId = deal?.hsObjectId;
+    if (!currentPortalId || !dealId) return;
+    try {
+      await supabase.functions.invoke("hubspot-update-deal", {
+        body: {
+          portalId: currentPortalId,
+          dealId,
+          properties: { last_time_app_used: Date.now().toString() },
+        },
+      });
+    } catch {
+      // Intentionally ignored: last_time_app_used is best-effort telemetry.
+    }
+  }, [portalId, deal?.hsObjectId]);
+
+  // Write the timestamp once when the app is opened on a deal.
+  useEffect(() => {
+    if (!portalId || !deal?.hsObjectId) return;
+    pushLastAppActivity();
+  }, [portalId, deal?.hsObjectId, pushLastAppActivity]);
+
+  // Quote state
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [formData, setFormData] = useState<QuoteFormData | null>(null);
+  const [savedConfig, setSavedConfig] = useState<QuoteFormData | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedData, setLastSavedData] = useState<string | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const autoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const formDataRef = useRef<QuoteFormData | null>(null);
+
+  // Installation state
+  const [installationFormData, setInstallationFormData] = useState<InstallationFormData | null>(null);
+  const [installationSavedConfig, setInstallationSavedConfig] = useState<Record<string, InstallationFormData>>({});
+  const [installationGenerating, setInstallationGenerating] = useState(false);
+  const [installationSaving, setInstallationSaving] = useState(false);
+  const [showInstallationPreview, setShowInstallationPreview] = useState(false);
+  const [installationHasUnsavedChanges, setInstallationHasUnsavedChanges] = useState(false);
+  const [installationLastSavedData, setInstallationLastSavedData] = useState<string | null>(null);
+  const installationPreviewRef = useRef<HTMLDivElement>(null);
+  const installationAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const installationFormDataRef = useRef<InstallationFormData | null>(null);
+
+  // Service Agreement state
+  const [serviceAgreementFormData, setServiceAgreementFormData] = useState<ServiceAgreementFormData | null>(null);
+  const [serviceAgreementSavedConfig, setServiceAgreementSavedConfig] = useState<ServiceAgreementFormData | null>(null);
+  const [serviceAgreementGenerating, setServiceAgreementGenerating] = useState(false);
+  const [serviceAgreementSaving, setServiceAgreementSaving] = useState(false);
+  const [showServiceAgreementPreview, setShowServiceAgreementPreview] = useState(false);
+  const [serviceAgreementHasUnsavedChanges, setServiceAgreementHasUnsavedChanges] = useState(false);
+  const [serviceAgreementLastSavedData, setServiceAgreementLastSavedData] = useState<string | null>(null);
+  const serviceAgreementPreviewRef = useRef<HTMLDivElement>(null);
+  const serviceAgreementAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const serviceAgreementFormDataRef = useRef<ServiceAgreementFormData | null>(null);
+
+  // FMV Lease state
+  const [fmvLeaseFormData, setFmvLeaseFormData] = useState<FMVLeaseFormData | null>(null);
+  const [fmvLeaseSavedConfig, setFmvLeaseSavedConfig] = useState<FMVLeaseFormData | null>(null);
+  const [fmvLeaseGenerating, setFmvLeaseGenerating] = useState(false);
+  const [fmvLeaseSaving, setFmvLeaseSaving] = useState(false);
+  const [showFMVLeasePreview, setShowFMVLeasePreview] = useState(false);
+  const [fmvLeaseHasUnsavedChanges, setFmvLeaseHasUnsavedChanges] = useState(false);
+  const [fmvLeaseLastSavedData, setFmvLeaseLastSavedData] = useState<string | null>(null);
+  const fmvLeasePreviewRef = useRef<HTMLDivElement>(null);
+  const fmvLeaseAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const fmvLeaseFormDataRef = useRef<FMVLeaseFormData | null>(null);
+
+  // Lease Funding state (per-line-item like Installation)
+  const [leaseFundingFormData, setLeaseFundingFormData] = useState<LeaseFundingFormData | null>(null);
+  const [leaseFundingSavedConfig, setLeaseFundingSavedConfig] = useState<Record<string, LeaseFundingFormData>>({});
+  const [leaseFundingGenerating, setLeaseFundingGenerating] = useState(false);
+  const [leaseFundingSaving, setLeaseFundingSaving] = useState(false);
+  const [showLeaseFundingPreview, setShowLeaseFundingPreview] = useState(false);
+  const [leaseFundingHasUnsavedChanges, setLeaseFundingHasUnsavedChanges] = useState(false);
+  const [leaseFundingLastSavedData, setLeaseFundingLastSavedData] = useState<string | null>(null);
+  const leaseFundingPreviewRef = useRef<HTMLDivElement>(null);
+  const leaseFundingAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const leaseFundingFormDataRef = useRef<LeaseFundingFormData | null>(null);
+
+  // LOI state
+  const [loiFormData, setLoiFormData] = useState<LoiFormData | null>(null);
+  const [loiSavedConfig, setLoiSavedConfig] = useState<LoiFormData | null>(null);
+  const [loiGenerating, setLoiGenerating] = useState(false);
+  const [loiSaving, setLoiSaving] = useState(false);
+  const [showLoiPreview, setShowLoiPreview] = useState(false);
+  const [loiHasUnsavedChanges, setLoiHasUnsavedChanges] = useState(false);
+  const [loiLastSavedData, setLoiLastSavedData] = useState<string | null>(null);
+  const loiPreviewRef = useRef<HTMLDivElement>(null);
+  const loiAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const loiFormDataRef = useRef<LoiFormData | null>(null);
+
+  // Lease Return state
+  const [leaseReturnFormData, setLeaseReturnFormData] = useState<LeaseReturnFormData | null>(null);
+  const [leaseReturnSavedConfig, setLeaseReturnSavedConfig] = useState<LeaseReturnFormData | null>(null);
+  const [leaseReturnGenerating, setLeaseReturnGenerating] = useState(false);
+  const [leaseReturnSaving, setLeaseReturnSaving] = useState(false);
+  const [showLeaseReturnPreview, setShowLeaseReturnPreview] = useState(false);
+  const [leaseReturnHasUnsavedChanges, setLeaseReturnHasUnsavedChanges] = useState(false);
+  const [leaseReturnLastSavedData, setLeaseReturnLastSavedData] = useState<string | null>(null);
+  const leaseReturnPreviewRef = useRef<HTMLDivElement>(null);
+  const leaseReturnAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const leaseReturnFormDataRef = useRef<LeaseReturnFormData | null>(null);
+
+  // Interterritorial state
+  const [interterritorialFormData, setInterterritorialFormData] = useState<InterterritorialFormData | null>(null);
+  const [interterritorialSavedConfig, setInterterritorialSavedConfig] = useState<InterterritorialFormData | null>(null);
+  const [interterritorialGenerating, setInterterritorialGenerating] = useState(false);
+  const [interterritorialSaving, setInterterritorialSaving] = useState(false);
+  const [showInterterritorialPreview, setShowInterterritorialPreview] = useState(false);
+  const [interterritorialHasUnsavedChanges, setInterterritorialHasUnsavedChanges] = useState(false);
+  const [interterritorialLastSavedData, setInterterritorialLastSavedData] = useState<string | null>(null);
+  const interterritorialPreviewRef = useRef<HTMLDivElement>(null);
+  const interterritorialAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const interterritorialFormDataRef = useRef<InterterritorialFormData | null>(null);
+
+  // New Customer state
+  const [newCustomerFormData, setNewCustomerFormData] = useState<NewCustomerFormData | null>(null);
+  const [newCustomerSavedConfig, setNewCustomerSavedConfig] = useState<NewCustomerFormData | null>(null);
+  const [newCustomerGenerating, setNewCustomerGenerating] = useState(false);
+  const [newCustomerSaving, setNewCustomerSaving] = useState(false);
+  const [showNewCustomerPreview, setShowNewCustomerPreview] = useState(false);
+  const [newCustomerHasUnsavedChanges, setNewCustomerHasUnsavedChanges] = useState(false);
+  const [newCustomerLastSavedData, setNewCustomerLastSavedData] = useState<string | null>(null);
+  const newCustomerPreviewRef = useRef<HTMLDivElement>(null);
+  const newCustomerAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const newCustomerFormDataRef = useRef<NewCustomerFormData | null>(null);
+
+  // Relocation state
+  const [relocationFormData, setRelocationFormData] = useState<RelocationFormData | null>(null);
+  const [relocationSavedConfig, setRelocationSavedConfig] = useState<RelocationFormData | null>(null);
+  const [relocationGenerating, setRelocationGenerating] = useState(false);
+  const [relocationSaving, setRelocationSaving] = useState(false);
+  const [showRelocationPreview, setShowRelocationPreview] = useState(false);
+  const [relocationHasUnsavedChanges, setRelocationHasUnsavedChanges] = useState(false);
+  const [relocationLastSavedData, setRelocationLastSavedData] = useState<string | null>(null);
+  const relocationPreviewRef = useRef<HTMLDivElement>(null);
+  const relocationAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const relocationFormDataRef = useRef<RelocationFormData | null>(null);
+
+  // Removal state
+  const [removalFormData, setRemovalFormData] = useState<RemovalFormData | null>(null);
+  const [removalSavedConfig, setRemovalSavedConfig] = useState<RemovalFormData | null>(null);
+  const [removalGenerating, setRemovalGenerating] = useState(false);
+  const [removalSaving, setRemovalSaving] = useState(false);
+  const [showRemovalPreview, setShowRemovalPreview] = useState(false);
+  const [removalHasUnsavedChanges, setRemovalHasUnsavedChanges] = useState(false);
+  const [removalLastSavedData, setRemovalLastSavedData] = useState<string | null>(null);
+  const removalPreviewRef = useRef<HTMLDivElement>(null);
+  const removalAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const removalFormDataRef = useRef<RemovalFormData | null>(null);
+
+  // Commission state
+  const [commissionFormData, setCommissionFormData] = useState<CommissionFormData | null>(null);
+  const [commissionSavedConfig, setCommissionSavedConfig] = useState<CommissionFormData | null>(null);
+  const [commissionGenerating, setCommissionGenerating] = useState(false);
+  const [commissionSaving, setCommissionSaving] = useState(false);
+  const [showCommissionPreview, setShowCommissionPreview] = useState(false);
+  const [commissionHasUnsavedChanges, setCommissionHasUnsavedChanges] = useState(false);
+  const [commissionLastSavedData, setCommissionLastSavedData] = useState<string | null>(null);
+  const commissionPreviewRef = useRef<HTMLDivElement>(null);
+  const commissionAutoSaveTimeoutRef = useRef<TimerId | null>(null);
+  const commissionFormDataRef = useRef<CommissionFormData | null>(null);
+
+  // Dealer info and settings
+  const [dealerInfo, setDealerInfo] = useState<DealerInfo | null>(null);
+  const [dealerSettings, setDealerSettings] = useState<DealerSettings>({});
+  const [documentTerms, setDocumentTerms] = useState<DocumentTerms>({});
+  const [commissionUsers, setCommissionUsers] = useState<
+    Array<{ hubspot_user_name: string; hubspot_user_id?: string; commission_percentage: number }>
+  >([]);
+
+  // Quote versioning
+  const [quoteVersions, setQuoteVersions] = useState<
+    Array<{
+      id: string;
+      version_number: number;
+      quote_number: string;
+      label: string;
+      created_by: string;
+      created_at: string;
+    }>
+  >([]);
+  const [currentQuoteNumber, setCurrentQuoteNumber] = useState<string | null>(null);
+  const [currentVersionId, setCurrentVersionId] = useState<string | null>(null);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+
+  // Quote templates
+  const [quoteTemplates, setQuoteTemplates] = useState<
+    Array<{
+      id: string;
+      name: string;
+      description: string;
+      shared: boolean;
+      created_by: string;
+      created_by_name: string;
+      created_at: string;
+    }>
+  >([]);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateShared, setTemplateShared] = useState(true);
+
+  // Feedback system
+  const [feedbackList, setFeedbackList] = useState<
+    Array<{
+      id: string;
+      type: string;
+      title: string;
+      description: string;
+      status: string;
+      admin_response: string;
+      submitted_by_name: string;
+      created_at: string;
+      updated_at: string;
+    }>
+  >([]);
+  const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackDescription, setFeedbackDescription] = useState("");
+  const [feedbackType, setFeedbackType] = useState<"bug" | "feature">("bug");
+
+  // configsLoaded gate: prevents forms from rendering before saved configs are fetched
+  const [configsLoaded, setConfigsLoaded] = useState(false);
+
+  // Custom Documents state
+  const [customDocuments, setCustomDocuments] = useState<CustomDocument[]>([]);
+  const [customDocFormData, setCustomDocFormData] = useState<Record<string, Record<string, any>>>({});
+  const [customDocSavedConfig, setCustomDocSavedConfig] = useState<Record<string, Record<string, any>>>({});
+  const [customDocGenerating, setCustomDocGenerating] = useState<Record<string, boolean>>({});
+  const [customDocSaving, setCustomDocSaving] = useState<Record<string, boolean>>({});
+  const [showCustomDocPreview, setShowCustomDocPreview] = useState<Record<string, boolean>>({});
+  const customDocPreviewRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Phase 1 shell: collapsible nav rail state
+  const [navExpanded, setNavExpanded] = useState(false);
+  const [navSearch, setNavSearch] = useState("");
+
+  // Keep formDataRef in sync with formData
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
+
+  // Keep installationFormDataRef in sync
+  useEffect(() => {
+    installationFormDataRef.current = installationFormData;
+  }, [installationFormData]);
+
+  // Keep serviceAgreementFormDataRef in sync
+  useEffect(() => {
+    serviceAgreementFormDataRef.current = serviceAgreementFormData;
+  }, [serviceAgreementFormData]);
+
+  // Keep fmvLeaseFormDataRef in sync
+  useEffect(() => {
+    fmvLeaseFormDataRef.current = fmvLeaseFormData;
+  }, [fmvLeaseFormData]);
+
+  // Keep leaseFundingFormDataRef in sync
+  useEffect(() => {
+    leaseFundingFormDataRef.current = leaseFundingFormData;
+  }, [leaseFundingFormData]);
+
+  // Keep leaseReturnFormDataRef in sync
+  useEffect(() => {
+    leaseReturnFormDataRef.current = leaseReturnFormData;
+  }, [leaseReturnFormData]);
+
+  // Keep interterritorialFormDataRef in sync
+  useEffect(() => {
+    interterritorialFormDataRef.current = interterritorialFormData;
+  }, [interterritorialFormData]);
+
+  // Keep newCustomerFormDataRef in sync
+  useEffect(() => {
+    newCustomerFormDataRef.current = newCustomerFormData;
+  }, [newCustomerFormData]);
+
+  // Keep relocationFormDataRef in sync
+  useEffect(() => {
+    relocationFormDataRef.current = relocationFormData;
+  }, [relocationFormData]);
+
+  // Keep removalFormDataRef in sync
+  useEffect(() => {
+    removalFormDataRef.current = removalFormData;
+  }, [removalFormData]);
+
+  // Keep commissionFormDataRef in sync
+  useEffect(() => {
+    commissionFormDataRef.current = commissionFormData;
+  }, [commissionFormData]);
+
+  // Keep loiFormDataRef in sync
+  useEffect(() => {
+    loiFormDataRef.current = loiFormData;
+  }, [loiFormData]);
+
+  // Initialize relocation form data when HubSpot data loads
+  useEffect(() => {
+    if (loading) return;
+    // Don't reinitialize if we already have data or if we have a saved config
+    if (relocationFormData || relocationSavedConfig) return;
+
+    const defaultData = getDefaultRelocationFormData();
+
+    // Pre-populate company name
+    if (company?.name) {
+      defaultData.companyName = company.name;
+    }
+
+    // Pre-populate submitted by from deal owner
+    if (dealOwner) {
+      defaultData.submittedBy = `${dealOwner.firstName || ""} ${dealOwner.lastName || ""}`.trim();
+    }
+
+    // Pre-populate Bill To from HubSpot company AP address (same as Service Agreement)
+    if (company) {
+      defaultData.billToAddress = company.apAddress || "";
+      const cityStZipParts = [company.apCity, company.apState, company.apZip].filter(Boolean);
+      // Format as "City, ST Zip"
+      if (cityStZipParts.length > 0) {
+        const city = company.apCity || "";
+        const state = company.apState || "";
+        const zip = company.apZip || "";
+        defaultData.billToCityStZip =
+          `${city}${city && state ? ", " : ""}${state}${(city || state) && zip ? " " : ""}${zip}`.trim();
+      }
+    }
+
+    // Pre-populate Bill To contact from labeled AP contact
+    if (labeledContacts?.apContact) {
+      const ap = labeledContacts.apContact;
+      defaultData.billToPhone = ap.phone || "";
+      defaultData.billToEmail = ap.email || "";
+    }
+
+    // Pre-populate Current Location from HubSpot company delivery address (Ship To)
+    if (company) {
+      defaultData.currentCompanyName = company.name || "";
+      defaultData.currentAddress = company.deliveryAddress || "";
+      defaultData.currentCity = company.deliveryCity || "";
+      defaultData.currentState = company.deliveryState || "";
+      defaultData.currentZip = company.deliveryZip || "";
+    }
+
+    // Pre-populate Current Location contact from labeled shipping contact
+    if (labeledContacts?.shippingContact) {
+      const sc = labeledContacts.shippingContact;
+      defaultData.currentContact = `${sc.firstName || ""} ${sc.lastName || ""}`.trim();
+      defaultData.currentPhone = sc.phone || "";
+      defaultData.currentEmail = sc.email || "";
+    }
+
+    // Pre-populate equipment from line items
+    if (lineItems && lineItems.length > 0) {
+      defaultData.equipmentItems = lineItems.slice(0, 20).map((item) => ({
+        id: item.hsObjectId || item.id || crypto.randomUUID(),
+        makeModel: item.name || item.model || item.sku || "",
+        serialNumber: item.serial || item.properties?.serial_number || "",
+        equipmentId: item.equipmentId || item.properties?.equipment_id || "",
+        networkPrint: false,
+        scan: false,
+        notes: "",
+      }));
+    }
+
+    setRelocationFormData(defaultData);
+  }, [loading, company, dealOwner, labeledContacts, lineItems, relocationFormData, relocationSavedConfig]);
+  // Fetch dealer info when portalId is available
+  useEffect(() => {
+    // Reset portal-specific state to prevent cross-tenant leakage
+    setDealerInfo(null);
+    setDealerSettings({});
+    setDocumentTerms({});
+    setCommissionUsers([]);
+    setCustomDocuments([]);
+    setConfigsLoaded(false);
+
+    const fetchDealerInfo = async () => {
+      const currentPortalId = portalId;
+      if (!currentPortalId) return;
+
+      try {
+        const { data, error } = await supabase.functions.invoke("dealer-account-get", {
+          body: { portalId: currentPortalId },
+        });
+
+        if (error) {
+          console.error("Error fetching dealer info:", error);
+          return;
+        }
+
+        if (data?.dealer) {
+          const d = data.dealer;
+          const addressParts = [
+            d.address_line1,
+            d.address_line2,
+            `${d.city || ""}, ${d.state || ""} ${d.zip_code || ""}`,
+          ]
+            .filter(Boolean)
+            .join(", ");
+
+          // Get quote-specific T&C or fall back to default
+          const quoteTerms = data.documentTerms?.quote || d.terms_and_conditions || "";
+
+          setDealerInfo({
+            companyName: d.company_name || "",
+            address: addressParts,
+            phone: d.phone || "",
+            website: d.website || "",
+            logoUrl: d.logo_url || undefined,
+            termsAndConditions: quoteTerms,
+          });
+        }
+
+        // Store document terms
+        if (data?.documentTerms) {
+          setDocumentTerms(data.documentTerms);
+        }
+
+        // Store dealer settings (meter methods, CCA)
+        if (data?.dealerSettings) {
+          setDealerSettings(data.dealerSettings);
+        }
+
+        // Store custom documents
+        if (data?.customDocuments) {
+          setCustomDocuments(data.customDocuments.filter((doc: CustomDocument) => doc.is_active));
+        }
+
+        // Store commission user settings
+        if (data?.commissionUsers) {
+          setCommissionUsers(data.commissionUsers);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dealer info:", err);
+      }
+    };
+
+    fetchDealerInfo();
+  }, [portalId]);
+
+  // Load ALL saved configurations in bulk via edge function
+  useEffect(() => {
+    const loadAllConfigs = async () => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+
+      if (!currentPortalId || !dealId) {
+        setConfigsLoaded(true);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase.functions.invoke("get-configurations-bulk", {
+          body: { portalId: currentPortalId, dealId },
+        });
+
+        if (error) {
+          console.error("Error loading configurations:", error);
+          return;
+        }
+
+        if (data?.data) {
+          const configs = data.data;
+
+          // Set quote config
+          if (configs.quote) {
+            console.log("Loaded saved quote configuration");
+            setSavedConfig(configs.quote as QuoteFormData);
+          }
+
+          // Set installation configs (keyed by line_item_id)
+          if (configs.installation && Object.keys(configs.installation).length > 0) {
+            console.log("Loaded saved installation configurations");
+            setInstallationSavedConfig(configs.installation as Record<string, InstallationFormData>);
+          }
+
+          // Set service agreement config
+          if (configs.serviceAgreement) {
+            console.log("Loaded saved service agreement configuration");
+            setServiceAgreementSavedConfig(configs.serviceAgreement as ServiceAgreementFormData);
+          }
+
+          // Set FMV lease config
+          if (configs.fmvLease) {
+            console.log("Loaded saved FMV lease configuration");
+            setFmvLeaseSavedConfig(configs.fmvLease as FMVLeaseFormData);
+          }
+
+          // Set lease funding configs (keyed by line_item_id)
+          if (configs.leaseFunding && Object.keys(configs.leaseFunding).length > 0) {
+            console.log("Loaded saved lease funding configurations");
+            setLeaseFundingSavedConfig(configs.leaseFunding as Record<string, LeaseFundingFormData>);
+          }
+
+          // Set lease return config
+          if (configs.leaseReturn) {
+            console.log("Loaded saved lease return configuration");
+            setLeaseReturnSavedConfig(configs.leaseReturn as LeaseReturnFormData);
+          }
+
+          // Set interterritorial config
+          if (configs.interterritorial) {
+            console.log("Loaded saved interterritorial configuration");
+            setInterterritorialSavedConfig(configs.interterritorial as InterterritorialFormData);
+          }
+
+          // Set new customer config
+          if (configs.newCustomer) {
+            console.log("Loaded saved new customer configuration");
+            setNewCustomerSavedConfig(configs.newCustomer as NewCustomerFormData);
+          }
+
+          // Set relocation config
+          if (configs.relocation) {
+            console.log("Loaded saved relocation configuration");
+            const savedRelocation = configs.relocation as RelocationFormData;
+            setRelocationSavedConfig(savedRelocation);
+            setRelocationFormData(savedRelocation);
+          }
+
+          // Set removal config
+          if (configs.removal) {
+            console.log("Loaded saved removal configuration");
+            const savedRemoval = configs.removal as RemovalFormData;
+            setRemovalSavedConfig(savedRemoval);
+            setRemovalFormData(savedRemoval);
+          }
+
+          // Set commission config
+          if (configs.commission) {
+            console.log("Loaded saved commission configuration");
+            const savedCommission = configs.commission as CommissionFormData;
+            setCommissionSavedConfig(savedCommission);
+            setCommissionFormData(savedCommission);
+          }
+
+          // Set custom document configs (keyed by custom_document_id)
+          if (configs.customDocuments && Object.keys(configs.customDocuments).length > 0) {
+            console.log("Loaded saved custom document configurations");
+            setCustomDocSavedConfig(configs.customDocuments as Record<string, Record<string, any>>);
+            setCustomDocFormData(configs.customDocuments as Record<string, Record<string, any>>);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load configurations:", err);
+      } finally {
+        setConfigsLoaded(true);
+      }
+    };
+
+    if (deal?.hsObjectId) {
+      loadAllConfigs();
+    }
+  }, [portalId, deal?.hsObjectId]);
+
+  // Load quote versions when deal is available
+  useEffect(() => {
+    if (deal?.hsObjectId && portalId) {
+      loadQuoteVersions();
+      loadQuoteTemplates();
+      loadFeedback();
+    }
+  }, [portalId, deal?.hsObjectId]);
+
+  // Silent auto-save function for Quote
+  const performAutoSave = useCallback(
+    async (dataToSave: QuoteFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+
+      if (!currentPortalId || !dealId || !dataToSave) return;
+
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === lastSavedData) return;
+
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "quote",
+            configuration: dataToSave,
+          },
+        });
+
+        if (!saveError) {
+          setLastSavedData(dataString);
+          setHasUnsavedChanges(false);
+          setSavedConfig(dataToSave);
+          console.log("Auto-saved configuration");
+        }
+      } catch (err) {
+        console.error("Auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, lastSavedData],
+  );
+
+  // Handle quote form change with auto-save debounce
+  const handleFormChange = useCallback(
+    (data: QuoteFormData) => {
+      setFormData(data);
+      setHasUnsavedChanges(true);
+
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (currentPortalId && dealId) {
+        try {
+          localStorage.setItem(
+            `quote_backup_${currentPortalId}_${dealId}`,
+            JSON.stringify({ configuration: data, updatedAt: new Date().toISOString() }),
+          );
+        } catch {
+          // ignore localStorage write errors
+        }
+      }
+
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        performAutoSave(data);
+      }, AUTO_SAVE_DELAY);
+    },
+    [performAutoSave, portalId, deal?.hsObjectId],
+  );
+
+  // Auto-save for installation
+  const performInstallationAutoSave = useCallback(
+    async (dataToSave: InstallationFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      const lineItemId = dataToSave.selectedLineItemId;
+
+      if (!currentPortalId || !dealId || !lineItemId || !dataToSave) return;
+
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === installationLastSavedData) return;
+
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "installation",
+            lineItemId,
+            configuration: dataToSave,
+          },
+        });
+
+        if (!saveError) {
+          setInstallationLastSavedData(dataString);
+          setInstallationHasUnsavedChanges(false);
+          setInstallationSavedConfig((prev) => ({ ...prev, [dataToSave.selectedLineItemId]: dataToSave }));
+          console.log("Auto-saved installation configuration");
+        }
+      } catch (err) {
+        console.error("Installation auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, installationLastSavedData],
+  );
+
+  // Handle installation form change
+  const handleInstallationFormChange = useCallback(
+    (data: InstallationFormData) => {
+      setInstallationFormData(data);
+      setInstallationHasUnsavedChanges(true);
+
+      if (installationAutoSaveTimeoutRef.current) {
+        clearTimeout(installationAutoSaveTimeoutRef.current);
+      }
+
+      if (data.selectedLineItemId) {
+        installationAutoSaveTimeoutRef.current = setTimeout(() => {
+          performInstallationAutoSave(data);
+        }, AUTO_SAVE_DELAY);
+      }
+    },
+    [performInstallationAutoSave],
+  );
+
+  // Auto-save for service agreement
+  const performServiceAgreementAutoSave = useCallback(
+    async (dataToSave: ServiceAgreementFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+
+      if (!currentPortalId || !dealId || !dataToSave) return;
+
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === serviceAgreementLastSavedData) return;
+
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "service_agreement",
+            configuration: dataToSave,
+          },
+        });
+
+        if (!saveError) {
+          setServiceAgreementLastSavedData(dataString);
+          setServiceAgreementHasUnsavedChanges(false);
+          setServiceAgreementSavedConfig(dataToSave);
+          console.log("Auto-saved service agreement configuration");
+        }
+      } catch (err) {
+        console.error("Service agreement auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, serviceAgreementLastSavedData],
+  );
+
+  // Handle service agreement form change
+  const handleServiceAgreementFormChange = useCallback(
+    (data: ServiceAgreementFormData) => {
+      setServiceAgreementFormData(data);
+      setServiceAgreementHasUnsavedChanges(true);
+
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (currentPortalId && dealId) {
+        try {
+          localStorage.setItem(
+            `service_agreement_backup_${currentPortalId}_${dealId}`,
+            JSON.stringify({ configuration: data, updatedAt: new Date().toISOString() }),
+          );
+        } catch {
+          // ignore
+        }
+      }
+
+      if (serviceAgreementAutoSaveTimeoutRef.current) {
+        clearTimeout(serviceAgreementAutoSaveTimeoutRef.current);
+      }
+
+      serviceAgreementAutoSaveTimeoutRef.current = setTimeout(() => {
+        performServiceAgreementAutoSave(data);
+      }, AUTO_SAVE_DELAY);
+    },
+    [performServiceAgreementAutoSave, portalId, deal?.hsObjectId],
+  );
+
+  // Auto-save for FMV Lease
+  const performFMVLeaseAutoSave = useCallback(
+    async (dataToSave: FMVLeaseFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+
+      if (!currentPortalId || !dealId || !dataToSave) return;
+
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === fmvLeaseLastSavedData) return;
+
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "fmv_lease",
+            configuration: dataToSave,
+          },
+        });
+
+        if (!saveError) {
+          setFmvLeaseLastSavedData(dataString);
+          setFmvLeaseHasUnsavedChanges(false);
+          setFmvLeaseSavedConfig(dataToSave);
+          console.log("Auto-saved FMV lease configuration");
+        }
+      } catch (err) {
+        console.error("FMV lease auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, fmvLeaseLastSavedData],
+  );
+
+  // Handle FMV Lease form change
+  const handleFMVLeaseFormChange = useCallback(
+    (data: FMVLeaseFormData) => {
+      setFmvLeaseFormData(data);
+      setFmvLeaseHasUnsavedChanges(true);
+
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (currentPortalId && dealId) {
+        try {
+          localStorage.setItem(
+            `fmv_lease_backup_${currentPortalId}_${dealId}`,
+            JSON.stringify({ configuration: data, updatedAt: new Date().toISOString() }),
+          );
+        } catch {
+          // ignore
+        }
+      }
+
+      if (fmvLeaseAutoSaveTimeoutRef.current) {
+        clearTimeout(fmvLeaseAutoSaveTimeoutRef.current);
+      }
+
+      fmvLeaseAutoSaveTimeoutRef.current = setTimeout(() => {
+        performFMVLeaseAutoSave(data);
+      }, AUTO_SAVE_DELAY);
+    },
+    [performFMVLeaseAutoSave, portalId, deal?.hsObjectId],
+  );
+
+  // Auto-save for Lease Funding (per-line-item like Installation)
+  const performLeaseFundingAutoSave = useCallback(
+    async (dataToSave: LeaseFundingFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      const lineItemId = dataToSave.selectedLineItemId;
+
+      if (!currentPortalId || !dealId || !lineItemId || !dataToSave) return;
+
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === leaseFundingLastSavedData) return;
+
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "lease_funding",
+            lineItemId,
+            configuration: dataToSave,
+          },
+        });
+
+        if (!saveError) {
+          setLeaseFundingLastSavedData(dataString);
+          setLeaseFundingHasUnsavedChanges(false);
+          if (lineItemId) setLeaseFundingSavedConfig((prev) => ({ ...prev, [lineItemId]: dataToSave }));
+          console.log("Auto-saved lease funding configuration");
+        }
+      } catch (err) {
+        console.error("Lease funding auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, leaseFundingLastSavedData],
+  );
+
+  // Handle lease funding form change
+  const handleLeaseFundingFormChange = useCallback(
+    (data: LeaseFundingFormData) => {
+      setLeaseFundingFormData(data);
+      setLeaseFundingHasUnsavedChanges(true);
+
+      if (leaseFundingAutoSaveTimeoutRef.current) {
+        clearTimeout(leaseFundingAutoSaveTimeoutRef.current);
+      }
+
+      if (data.selectedLineItemId) {
+        leaseFundingAutoSaveTimeoutRef.current = setTimeout(() => {
+          performLeaseFundingAutoSave(data);
+        }, AUTO_SAVE_DELAY);
+      }
+    },
+    [performLeaseFundingAutoSave],
+  );
+
+  // Auto-save for LOI
+  const performLoiAutoSave = useCallback(
+    async (dataToSave: LoiFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+
+      if (!currentPortalId || !dealId || !dataToSave) return;
+
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === loiLastSavedData) return;
+
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "loi",
+            configuration: dataToSave,
+          },
+        });
+
+        if (!saveError) {
+          setLoiLastSavedData(dataString);
+          setLoiHasUnsavedChanges(false);
+          setLoiSavedConfig(dataToSave);
+          console.log("Auto-saved LOI configuration");
+        }
+      } catch (err) {
+        console.error("LOI auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, loiLastSavedData],
+  );
+
+  // Handle LOI form change
+  const handleLoiFormChange = useCallback(
+    (data: LoiFormData) => {
+      setLoiFormData(data);
+      setLoiHasUnsavedChanges(true);
+
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (currentPortalId && dealId) {
+        try {
+          localStorage.setItem(
+            `loi_backup_${currentPortalId}_${dealId}`,
+            JSON.stringify({ configuration: data, updatedAt: new Date().toISOString() }),
+          );
+        } catch {
+          // ignore
+        }
+      }
+
+      if (loiAutoSaveTimeoutRef.current) {
+        clearTimeout(loiAutoSaveTimeoutRef.current);
+      }
+
+      loiAutoSaveTimeoutRef.current = setTimeout(() => {
+        performLoiAutoSave(data);
+      }, AUTO_SAVE_DELAY);
+    },
+    [performLoiAutoSave, portalId, deal?.hsObjectId],
+  );
+
+  // Auto-save for Lease Return
+  const performLeaseReturnAutoSave = useCallback(
+    async (dataToSave: LeaseReturnFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+
+      if (!currentPortalId || !dealId || !dataToSave) return;
+
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === leaseReturnLastSavedData) return;
+
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "lease_return",
+            configuration: dataToSave,
+          },
+        });
+
+        if (!saveError) {
+          setLeaseReturnLastSavedData(dataString);
+          setLeaseReturnHasUnsavedChanges(false);
+          setLeaseReturnSavedConfig(dataToSave);
+          console.log("Auto-saved lease return configuration");
+        }
+      } catch (err) {
+        console.error("Lease return auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, leaseReturnLastSavedData],
+  );
+
+  // Handle lease return form change
+  const handleLeaseReturnFormChange = useCallback(
+    (data: LeaseReturnFormData) => {
+      setLeaseReturnFormData(data);
+      setLeaseReturnHasUnsavedChanges(true);
+
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (currentPortalId && dealId) {
+        try {
+          localStorage.setItem(
+            `lease_return_backup_${currentPortalId}_${dealId}`,
+            JSON.stringify({ configuration: data, updatedAt: new Date().toISOString() }),
+          );
+        } catch {
+          // ignore
+        }
+      }
+
+      if (leaseReturnAutoSaveTimeoutRef.current) {
+        clearTimeout(leaseReturnAutoSaveTimeoutRef.current);
+      }
+
+      leaseReturnAutoSaveTimeoutRef.current = setTimeout(() => {
+        performLeaseReturnAutoSave(data);
+      }, AUTO_SAVE_DELAY);
+    },
+    [performLeaseReturnAutoSave, portalId, deal?.hsObjectId],
+  );
+
+  // Auto-save for Interterritorial
+  const performInterterritorialAutoSave = useCallback(
+    async (dataToSave: InterterritorialFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+
+      if (!currentPortalId || !dealId || !dataToSave) return;
+
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === interterritorialLastSavedData) return;
+
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "interterritorial",
+            configuration: dataToSave,
+          },
+        });
+
+        if (!saveError) {
+          setInterterritorialLastSavedData(dataString);
+          setInterterritorialHasUnsavedChanges(false);
+          setInterterritorialSavedConfig(dataToSave);
+          console.log("Auto-saved interterritorial configuration");
+        }
+      } catch (err) {
+        console.error("Interterritorial auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, interterritorialLastSavedData],
+  );
+
+  // Handle interterritorial form change
+  const handleInterterritorialFormChange = useCallback(
+    (data: InterterritorialFormData) => {
+      setInterterritorialFormData(data);
+      setInterterritorialHasUnsavedChanges(true);
+
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (currentPortalId && dealId) {
+        try {
+          localStorage.setItem(
+            `interterritorial_backup_${currentPortalId}_${dealId}`,
+            JSON.stringify({ configuration: data, updatedAt: new Date().toISOString() }),
+          );
+        } catch {
+          // ignore
+        }
+      }
+
+      if (interterritorialAutoSaveTimeoutRef.current) {
+        clearTimeout(interterritorialAutoSaveTimeoutRef.current);
+      }
+
+      interterritorialAutoSaveTimeoutRef.current = setTimeout(() => {
+        performInterterritorialAutoSave(data);
+      }, AUTO_SAVE_DELAY);
+    },
+    [performInterterritorialAutoSave, portalId, deal?.hsObjectId],
+  );
+
+  // Auto-save for New Customer
+  const performNewCustomerAutoSave = useCallback(
+    async (dataToSave: NewCustomerFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (!currentPortalId || !dealId || !dataToSave) return;
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === newCustomerLastSavedData) return;
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: { portalId: currentPortalId, dealId, configType: "new_customer", configuration: dataToSave },
+        });
+        if (!saveError) {
+          setNewCustomerLastSavedData(dataString);
+          setNewCustomerHasUnsavedChanges(false);
+          setNewCustomerSavedConfig(dataToSave);
+          console.log("Auto-saved new customer configuration");
+        }
+      } catch (err) {
+        console.error("New customer auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, newCustomerLastSavedData],
+  );
+
+  const handleNewCustomerFormChange = useCallback(
+    (data: NewCustomerFormData) => {
+      setNewCustomerFormData(data);
+      setNewCustomerHasUnsavedChanges(true);
+
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (currentPortalId && dealId) {
+        try {
+          localStorage.setItem(
+            `new_customer_backup_${currentPortalId}_${dealId}`,
+            JSON.stringify({ configuration: data, updatedAt: new Date().toISOString() }),
+          );
+        } catch {
+          // ignore
+        }
+      }
+
+      if (newCustomerAutoSaveTimeoutRef.current) clearTimeout(newCustomerAutoSaveTimeoutRef.current);
+      newCustomerAutoSaveTimeoutRef.current = setTimeout(() => performNewCustomerAutoSave(data), AUTO_SAVE_DELAY);
+    },
+    [performNewCustomerAutoSave, portalId, deal?.hsObjectId],
+  );
+
+  const handleNewCustomerClearAll = useCallback(() => {
+    const emptyForm: NewCustomerFormData = {
+      companyName: "",
+      tradeName: "",
+      businessDescription: "",
+      taxId: "",
+      taxIdState: "",
+      yearEstablished: "",
+      yearsOwned: "",
+      creditRequested: "",
+      businessType: "",
+      hqAddress: "",
+      hqAddress2: "",
+      hqCity: "",
+      hqState: "",
+      hqZip: "",
+      hqPhone: "",
+      hqFax: "",
+      hqEmail: "",
+      branchSameAsHq: false,
+      branchAddress: "",
+      branchAddress2: "",
+      branchCity: "",
+      branchState: "",
+      branchZip: "",
+      branchPhone: "",
+      branchFax: "",
+      branchEmail: "",
+      billingSameAsHq: false,
+      billingSameAsBranch: false,
+      billingAddress: "",
+      billingAddress2: "",
+      billingCity: "",
+      billingState: "",
+      billingZip: "",
+      billingPhone: "",
+      billingFax: "",
+      billingEmail: "",
+      principalName: "",
+      principalTitle: "",
+      principalPhone: "",
+      principalEmail: "",
+      equipmentContactName: "",
+      equipmentContactTitle: "",
+      equipmentContactPhone: "",
+      equipmentContactEmail: "",
+      apContactName: "",
+      apContactTitle: "",
+      apContactPhone: "",
+      apContactEmail: "",
+      interestOfficeMachines: false,
+      interestFurniture: false,
+      interestSupplies: false,
+      interestOther: "",
+      bankReferences: [
+        { id: "bank-1", bankName: "", address: "", cityStZip: "", contact: "", phone: "", accountNumber: "" },
+        { id: "bank-2", bankName: "", address: "", cityStZip: "", contact: "", phone: "", accountNumber: "" },
+      ],
+      businessReferences: [
+        { id: "biz-1", company: "", contact: "", title: "", phone: "", email: "" },
+        { id: "biz-2", company: "", contact: "", title: "", phone: "", email: "" },
+      ],
+      invoiceDelivery: "email",
+      invoiceEmail: "",
+      invoiceSecondaryEmail: "",
+      paymentMethod: "",
+    };
+    setNewCustomerFormData(emptyForm);
+  }, []);
+
+  const handleNewCustomerSave = async () => {
+    if (!newCustomerFormData) {
+      toast.error("No data to save");
+      return;
+    }
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+    setNewCustomerSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: { portalId: currentPortalId, dealId, configType: "new_customer", configuration: newCustomerFormData },
+      });
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save");
+        return;
+      }
+      setNewCustomerSavedConfig(newCustomerFormData);
+      setNewCustomerLastSavedData(JSON.stringify(newCustomerFormData));
+      setNewCustomerHasUnsavedChanges(false);
+      toast.success("New customer application saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save");
+    } finally {
+      setNewCustomerSaving(false);
+    }
+  };
+
+  const handleNewCustomerGeneratePDF = async () => {
+    if (!newCustomerPreviewRef.current || !newCustomerFormData) {
+      toast.error("Please fill in the form first");
+      return;
+    }
+    setNewCustomerGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(newCustomerPreviewRef.current);
+      const sanitizedCompanyName = (newCustomerFormData.companyName || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      pdf.save(`NewCustomer_${sanitizedCompanyName}_${new Date().toISOString().split("T")[0]}.pdf`);
+      toast.success("PDF generated");
+    } catch (err) {
+      console.error("PDF error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setNewCustomerGenerating(false);
+    }
+  };
+
+  const handleNewCustomerPreview = () => setShowNewCustomerPreview(true);
+
+  // Relocation auto-save
+  const performRelocationAutoSave = useCallback(
+    async (dataToSave: RelocationFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (!currentPortalId || !dealId || !dataToSave) return;
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === relocationLastSavedData) return;
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: { portalId: currentPortalId, dealId, configType: "relocation", configuration: dataToSave },
+        });
+        if (!saveError) {
+          setRelocationLastSavedData(dataString);
+          setRelocationHasUnsavedChanges(false);
+          setRelocationSavedConfig(dataToSave);
+          console.log("Auto-saved relocation configuration");
+        }
+      } catch (err) {
+        console.error("Relocation auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, relocationLastSavedData],
+  );
+
+  const handleRelocationFormChange = useCallback(
+    (data: RelocationFormData) => {
+      setRelocationFormData(data);
+      setRelocationHasUnsavedChanges(true);
+
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (currentPortalId && dealId) {
+        try {
+          localStorage.setItem(
+            `relocation_backup_${currentPortalId}_${dealId}`,
+            JSON.stringify({ configuration: data, updatedAt: new Date().toISOString() }),
+          );
+        } catch {
+          // ignore
+        }
+      }
+
+      if (relocationAutoSaveTimeoutRef.current) clearTimeout(relocationAutoSaveTimeoutRef.current);
+      relocationAutoSaveTimeoutRef.current = setTimeout(() => performRelocationAutoSave(data), AUTO_SAVE_DELAY);
+    },
+    [performRelocationAutoSave, portalId, deal?.hsObjectId],
+  );
+
+  const handleRelocationSave = async () => {
+    if (!relocationFormData) {
+      toast.error("No data to save");
+      return;
+    }
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+    setRelocationSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: { portalId: currentPortalId, dealId, configType: "relocation", configuration: relocationFormData },
+      });
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save");
+        return;
+      }
+      setRelocationSavedConfig(relocationFormData);
+      setRelocationLastSavedData(JSON.stringify(relocationFormData));
+      setRelocationHasUnsavedChanges(false);
+      toast.success("Relocation request saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save");
+    } finally {
+      setRelocationSaving(false);
+    }
+  };
+
+  const handleRelocationGeneratePDF = async () => {
+    if (!relocationPreviewRef.current || !relocationFormData) {
+      toast.error("Please fill in the form first");
+      return;
+    }
+    setRelocationGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(relocationPreviewRef.current);
+      const sanitizedCompanyName = (relocationFormData.companyName || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      pdf.save(`Relocation_${sanitizedCompanyName}_${new Date().toISOString().split("T")[0]}.pdf`);
+      toast.success("PDF generated");
+    } catch (err) {
+      console.error("PDF error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setRelocationGenerating(false);
+    }
+  };
+
+  const handleRelocationPreview = () => setShowRelocationPreview(true);
+
+  // Removal auto-save
+  const performRemovalAutoSave = useCallback(
+    async (dataToSave: RemovalFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (!currentPortalId || !dealId || !dataToSave) return;
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === removalLastSavedData) return;
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: { portalId: currentPortalId, dealId, configType: "removal", configuration: dataToSave },
+        });
+        if (!saveError) {
+          setRemovalLastSavedData(dataString);
+          setRemovalHasUnsavedChanges(false);
+          setRemovalSavedConfig(dataToSave);
+          console.log("Auto-saved removal configuration");
+        }
+      } catch (err) {
+        console.error("Removal auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, removalLastSavedData],
+  );
+
+  const handleRemovalFormChange = useCallback(
+    (data: RemovalFormData) => {
+      setRemovalFormData(data);
+      setRemovalHasUnsavedChanges(true);
+
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (currentPortalId && dealId) {
+        try {
+          localStorage.setItem(
+            `removal_backup_${currentPortalId}_${dealId}`,
+            JSON.stringify({ configuration: data, updatedAt: new Date().toISOString() }),
+          );
+        } catch {
+          // ignore
+        }
+      }
+
+      if (removalAutoSaveTimeoutRef.current) clearTimeout(removalAutoSaveTimeoutRef.current);
+      removalAutoSaveTimeoutRef.current = setTimeout(() => performRemovalAutoSave(data), AUTO_SAVE_DELAY);
+    },
+    [performRemovalAutoSave, portalId, deal?.hsObjectId],
+  );
+
+  const handleRemovalSave = async () => {
+    if (!removalFormData) {
+      toast.error("No data to save");
+      return;
+    }
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+    setRemovalSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: { portalId: currentPortalId, dealId, configType: "removal", configuration: removalFormData },
+      });
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save");
+        return;
+      }
+      setRemovalSavedConfig(removalFormData);
+      setRemovalLastSavedData(JSON.stringify(removalFormData));
+      setRemovalHasUnsavedChanges(false);
+      toast.success("Removal form saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save");
+    } finally {
+      setRemovalSaving(false);
+    }
+  };
+
+  const handleRemovalGeneratePDF = async () => {
+    if (!removalPreviewRef.current || !removalFormData) {
+      toast.error("Please fill in the form first");
+      return;
+    }
+    setRemovalGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(removalPreviewRef.current);
+      const sanitizedCompanyName = (removalFormData.shipToCustomer || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      pdf.save(`Removal_${sanitizedCompanyName}_${new Date().toISOString().split("T")[0]}.pdf`);
+      toast.success("PDF generated");
+    } catch (err) {
+      console.error("PDF error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setRemovalGenerating(false);
+    }
+  };
+
+  const handleRemovalPreview = () => setShowRemovalPreview(true);
+
+  // Commission auto-save
+  const performCommissionAutoSave = useCallback(
+    async (dataToSave: CommissionFormData) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (!currentPortalId || !dealId || !dataToSave) return;
+      const dataString = JSON.stringify(dataToSave);
+      if (dataString === commissionLastSavedData) return;
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: { portalId: currentPortalId, dealId, configType: "commission", configuration: dataToSave },
+        });
+        if (!saveError) {
+          setCommissionLastSavedData(dataString);
+          setCommissionHasUnsavedChanges(false);
+          setCommissionSavedConfig(dataToSave);
+          console.log("Auto-saved commission configuration");
+        }
+      } catch (err) {
+        console.error("Commission auto-save error:", err);
+      }
+    },
+    [portalId, deal?.hsObjectId, commissionLastSavedData],
+  );
+
+  const handleCommissionFormChange = useCallback(
+    (data: CommissionFormData) => {
+      setCommissionFormData(data);
+      setCommissionHasUnsavedChanges(true);
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      if (currentPortalId && dealId) {
+        try {
+          localStorage.setItem(
+            `commission_backup_${currentPortalId}_${dealId}`,
+            JSON.stringify({ configuration: data, updatedAt: new Date().toISOString() }),
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+      if (commissionAutoSaveTimeoutRef.current) clearTimeout(commissionAutoSaveTimeoutRef.current);
+      commissionAutoSaveTimeoutRef.current = setTimeout(() => performCommissionAutoSave(data), AUTO_SAVE_DELAY);
+    },
+    [performCommissionAutoSave, portalId, deal?.hsObjectId],
+  );
+
+  const handleCommissionSave = async () => {
+    if (!commissionFormData) {
+      toast.error("No data to save");
+      return;
+    }
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+    setCommissionSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: { portalId: currentPortalId, dealId, configType: "commission", configuration: commissionFormData },
+      });
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save");
+        return;
+      }
+      setCommissionSavedConfig(commissionFormData);
+      setCommissionLastSavedData(JSON.stringify(commissionFormData));
+      setCommissionHasUnsavedChanges(false);
+      toast.success("Commission worksheet saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save");
+    } finally {
+      setCommissionSaving(false);
+    }
+  };
+
+  const handleCommissionGeneratePDF = async () => {
+    if (!commissionPreviewRef.current || !commissionFormData) {
+      toast.error("Please fill in the form first");
+      return;
+    }
+    setCommissionGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(commissionPreviewRef.current);
+      const sanitizedName = (commissionFormData.customer || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      pdf.save(`Commission_${sanitizedName}_${new Date().toISOString().split("T")[0]}.pdf`);
+      toast.success("PDF generated");
+    } catch (err) {
+      console.error("PDF error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setCommissionGenerating(false);
+    }
+  };
+
+  const handleCommissionPreview = () => setShowCommissionPreview(true);
+
+  // LOI handlers
+  const handleLoiSave = async () => {
+    if (!loiFormData) {
+      toast.error("No data to save");
+      return;
+    }
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+    setLoiSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: { portalId: currentPortalId, dealId, configType: "loi", configuration: loiFormData },
+      });
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save");
+        return;
+      }
+      setLoiSavedConfig(loiFormData);
+      setLoiLastSavedData(JSON.stringify(loiFormData));
+      setLoiHasUnsavedChanges(false);
+      toast.success("Letter of Intent saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save");
+    } finally {
+      setLoiSaving(false);
+    }
+  };
+
+  const handleLoiGeneratePDF = async () => {
+    if (!loiPreviewRef.current || !loiFormData) {
+      toast.error("Please fill in the form first");
+      return;
+    }
+    setLoiGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(loiPreviewRef.current);
+      const sanitizedCompanyName = (loiFormData.businessName || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      const fileName = `LOI_${sanitizedCompanyName}_${new Date().toISOString().split("T")[0]}.pdf`;
+      pdf.save(fileName);
+
+      const currentPortalId = portalId;
+      const currentDealId = deal?.hsObjectId;
+
+      if (currentPortalId && currentDealId) {
+        try {
+          const pdfBase64 = pdf.output("datauristring").split(",")[1];
+          const { data, error: attachError } = await supabase.functions.invoke("hubspot-attach-file", {
+            body: { portalId: currentPortalId, dealId: currentDealId, fileName, fileBase64: pdfBase64 },
+          });
+          if (attachError || data?.error) {
+            toast.success("PDF downloaded! (Could not attach to deal)");
+          } else {
+            toast.success("PDF downloaded and attached to deal!");
+          }
+        } catch (attachErr) {
+          console.error("Failed to attach to HubSpot:", attachErr);
+          toast.success("PDF downloaded! (Could not attach to deal)");
+        }
+      } else {
+        toast.success("LOI PDF downloaded successfully!");
+      }
+    } catch (err) {
+      console.error("PDF error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setLoiGenerating(false);
+    }
+  };
+
+  const handleLoiPreview = () => setShowLoiPreview(true);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (
+        (hasUnsavedChanges && formDataRef.current) ||
+        (installationHasUnsavedChanges && installationFormDataRef.current) ||
+        (serviceAgreementHasUnsavedChanges && serviceAgreementFormDataRef.current) ||
+        (fmvLeaseHasUnsavedChanges && fmvLeaseFormDataRef.current) ||
+        (leaseFundingHasUnsavedChanges && leaseFundingFormDataRef.current) ||
+        (loiHasUnsavedChanges && loiFormDataRef.current) ||
+        (leaseReturnHasUnsavedChanges && leaseReturnFormDataRef.current) ||
+        (interterritorialHasUnsavedChanges && interterritorialFormDataRef.current) ||
+        (relocationHasUnsavedChanges && relocationFormDataRef.current) ||
+        (removalHasUnsavedChanges && removalFormDataRef.current) ||
+        (commissionHasUnsavedChanges && commissionFormDataRef.current)
+      ) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        if (hasUnsavedChanges && formDataRef.current) {
+          performAutoSave(formDataRef.current);
+        }
+        if (installationHasUnsavedChanges && installationFormDataRef.current) {
+          performInstallationAutoSave(installationFormDataRef.current);
+        }
+        if (serviceAgreementHasUnsavedChanges && serviceAgreementFormDataRef.current) {
+          performServiceAgreementAutoSave(serviceAgreementFormDataRef.current);
+        }
+        if (fmvLeaseHasUnsavedChanges && fmvLeaseFormDataRef.current) {
+          performFMVLeaseAutoSave(fmvLeaseFormDataRef.current);
+        }
+        if (leaseFundingHasUnsavedChanges && leaseFundingFormDataRef.current) {
+          performLeaseFundingAutoSave(leaseFundingFormDataRef.current);
+        }
+        if (loiHasUnsavedChanges && loiFormDataRef.current) {
+          performLoiAutoSave(loiFormDataRef.current);
+        }
+        if (leaseReturnHasUnsavedChanges && leaseReturnFormDataRef.current) {
+          performLeaseReturnAutoSave(leaseReturnFormDataRef.current);
+        }
+        if (interterritorialHasUnsavedChanges && interterritorialFormDataRef.current) {
+          performInterterritorialAutoSave(interterritorialFormDataRef.current);
+        }
+        if (relocationHasUnsavedChanges && relocationFormDataRef.current) {
+          performRelocationAutoSave(relocationFormDataRef.current);
+        }
+        if (removalHasUnsavedChanges && removalFormDataRef.current) {
+          performRemovalAutoSave(removalFormDataRef.current);
+        }
+        if (commissionHasUnsavedChanges && commissionFormDataRef.current) {
+          performCommissionAutoSave(commissionFormDataRef.current);
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      if (installationAutoSaveTimeoutRef.current) {
+        clearTimeout(installationAutoSaveTimeoutRef.current);
+      }
+      if (serviceAgreementAutoSaveTimeoutRef.current) {
+        clearTimeout(serviceAgreementAutoSaveTimeoutRef.current);
+      }
+      if (fmvLeaseAutoSaveTimeoutRef.current) {
+        clearTimeout(fmvLeaseAutoSaveTimeoutRef.current);
+      }
+      if (leaseFundingAutoSaveTimeoutRef.current) {
+        clearTimeout(leaseFundingAutoSaveTimeoutRef.current);
+      }
+      if (loiAutoSaveTimeoutRef.current) {
+        clearTimeout(loiAutoSaveTimeoutRef.current);
+      }
+      if (leaseReturnAutoSaveTimeoutRef.current) {
+        clearTimeout(leaseReturnAutoSaveTimeoutRef.current);
+      }
+      if (interterritorialAutoSaveTimeoutRef.current) {
+        clearTimeout(interterritorialAutoSaveTimeoutRef.current);
+      }
+      if (relocationAutoSaveTimeoutRef.current) {
+        clearTimeout(relocationAutoSaveTimeoutRef.current);
+      }
+      if (removalAutoSaveTimeoutRef.current) {
+        clearTimeout(removalAutoSaveTimeoutRef.current);
+      }
+      if (commissionAutoSaveTimeoutRef.current) {
+        clearTimeout(commissionAutoSaveTimeoutRef.current);
+      }
+    };
+  }, [
+    hasUnsavedChanges,
+    installationHasUnsavedChanges,
+    serviceAgreementHasUnsavedChanges,
+    fmvLeaseHasUnsavedChanges,
+    leaseFundingHasUnsavedChanges,
+    loiHasUnsavedChanges,
+    leaseReturnHasUnsavedChanges,
+    interterritorialHasUnsavedChanges,
+    relocationHasUnsavedChanges,
+    removalHasUnsavedChanges,
+    commissionHasUnsavedChanges,
+    performAutoSave,
+    performInstallationAutoSave,
+    performServiceAgreementAutoSave,
+    performFMVLeaseAutoSave,
+    performLeaseFundingAutoSave,
+    performLoiAutoSave,
+    performLeaseReturnAutoSave,
+    performInterterritorialAutoSave,
+    performRelocationAutoSave,
+    performRemovalAutoSave,
+    performCommissionAutoSave,
+  ]);
+
+  // Recover from localStorage backups (portal+deal scoped; prevents cross-tenant leakage)
+  useEffect(() => {
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+    if (!currentPortalId || !dealId) return;
+
+    // Clean up stale backups older than 24 hours (from any portal/deal)
+    try {
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.includes("_backup_")) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed?.updatedAt) {
+                const updatedAt = new Date(parsed.updatedAt).getTime();
+                if (updatedAt < cutoff) {
+                  keysToRemove.push(key);
+                }
+              }
+            }
+          } catch {
+            /* skip unparseable entries */
+          }
+        }
+      }
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+      if (keysToRemove.length > 0) {
+        console.log(`Cleaned up ${keysToRemove.length} stale backup keys`);
+      }
+    } catch {
+      /* ignore cleanup errors */
+    }
+
+    const readBackup = <T,>(key: string): T | null => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        return (parsed?.configuration ?? null) as T | null;
+      } catch {
+        return null;
+      }
+    };
+
+    const quoteBackup = readBackup<QuoteFormData>(`quote_backup_${currentPortalId}_${dealId}`);
+    if (quoteBackup && !savedConfig) {
+      setSavedConfig(quoteBackup);
+      if (!formDataRef.current) setFormData(quoteBackup);
+      setHasUnsavedChanges(true);
+      localStorage.removeItem(`quote_backup_${currentPortalId}_${dealId}`);
+      localStorage.removeItem(`quote_backup_${dealId}`); // legacy cleanup
+    }
+
+    const serviceAgreementBackup = readBackup<ServiceAgreementFormData>(
+      `service_agreement_backup_${currentPortalId}_${dealId}`,
+    );
+    if (serviceAgreementBackup && !serviceAgreementSavedConfig) {
+      setServiceAgreementSavedConfig(serviceAgreementBackup);
+      if (!serviceAgreementFormDataRef.current) setServiceAgreementFormData(serviceAgreementBackup);
+      setServiceAgreementHasUnsavedChanges(true);
+      localStorage.removeItem(`service_agreement_backup_${currentPortalId}_${dealId}`);
+    }
+
+    const fmvLeaseBackup = readBackup<FMVLeaseFormData>(`fmv_lease_backup_${currentPortalId}_${dealId}`);
+    if (fmvLeaseBackup && !fmvLeaseSavedConfig) {
+      setFmvLeaseSavedConfig(fmvLeaseBackup);
+      if (!fmvLeaseFormDataRef.current) setFmvLeaseFormData(fmvLeaseBackup);
+      setFmvLeaseHasUnsavedChanges(true);
+      localStorage.removeItem(`fmv_lease_backup_${currentPortalId}_${dealId}`);
+    }
+
+    const loiBackup = readBackup<LoiFormData>(`loi_backup_${currentPortalId}_${dealId}`);
+    if (loiBackup && !loiSavedConfig) {
+      setLoiSavedConfig(loiBackup);
+      if (!loiFormDataRef.current) setLoiFormData(loiBackup);
+      setLoiHasUnsavedChanges(true);
+      localStorage.removeItem(`loi_backup_${currentPortalId}_${dealId}`);
+    }
+
+    const leaseReturnBackup = readBackup<LeaseReturnFormData>(`lease_return_backup_${currentPortalId}_${dealId}`);
+    if (leaseReturnBackup && !leaseReturnSavedConfig) {
+      setLeaseReturnSavedConfig(leaseReturnBackup);
+      if (!leaseReturnFormDataRef.current) setLeaseReturnFormData(leaseReturnBackup);
+      setLeaseReturnHasUnsavedChanges(true);
+      localStorage.removeItem(`lease_return_backup_${currentPortalId}_${dealId}`);
+    }
+
+    const interterritorialBackup = readBackup<InterterritorialFormData>(
+      `interterritorial_backup_${currentPortalId}_${dealId}`,
+    );
+    if (interterritorialBackup && !interterritorialSavedConfig) {
+      setInterterritorialSavedConfig(interterritorialBackup);
+      if (!interterritorialFormDataRef.current) setInterterritorialFormData(interterritorialBackup);
+      setInterterritorialHasUnsavedChanges(true);
+      localStorage.removeItem(`interterritorial_backup_${currentPortalId}_${dealId}`);
+    }
+
+    const newCustomerBackup = readBackup<NewCustomerFormData>(`new_customer_backup_${currentPortalId}_${dealId}`);
+    if (newCustomerBackup && !newCustomerSavedConfig) {
+      setNewCustomerSavedConfig(newCustomerBackup);
+      if (!newCustomerFormDataRef.current) setNewCustomerFormData(newCustomerBackup);
+      setNewCustomerHasUnsavedChanges(true);
+      localStorage.removeItem(`new_customer_backup_${currentPortalId}_${dealId}`);
+    }
+
+    const relocationBackup = readBackup<RelocationFormData>(`relocation_backup_${currentPortalId}_${dealId}`);
+    if (relocationBackup && !relocationSavedConfig) {
+      setRelocationSavedConfig(relocationBackup);
+      if (!relocationFormDataRef.current) setRelocationFormData(relocationBackup);
+      setRelocationHasUnsavedChanges(true);
+      localStorage.removeItem(`relocation_backup_${currentPortalId}_${dealId}`);
+    }
+
+    const removalBackup = readBackup<RemovalFormData>(`removal_backup_${currentPortalId}_${dealId}`);
+    if (removalBackup && !removalSavedConfig) {
+      setRemovalSavedConfig(removalBackup);
+      if (!removalFormDataRef.current) setRemovalFormData(removalBackup);
+      setRemovalHasUnsavedChanges(true);
+      localStorage.removeItem(`removal_backup_${currentPortalId}_${dealId}`);
+    }
+
+    const commissionBackup = readBackup<CommissionFormData>(`commission_backup_${currentPortalId}_${dealId}`);
+    if (commissionBackup && !commissionSavedConfig) {
+      setCommissionSavedConfig(commissionBackup);
+      if (!commissionFormDataRef.current) setCommissionFormData(commissionBackup);
+      setCommissionHasUnsavedChanges(true);
+      localStorage.removeItem(`commission_backup_${currentPortalId}_${dealId}`);
+    }
+  }, [
+    portalId,
+    deal?.hsObjectId,
+    savedConfig,
+    serviceAgreementSavedConfig,
+    fmvLeaseSavedConfig,
+    loiSavedConfig,
+    leaseReturnSavedConfig,
+    interterritorialSavedConfig,
+    newCustomerSavedConfig,
+    relocationSavedConfig,
+    removalSavedConfig,
+    commissionSavedConfig,
+  ]);
+
+  const handleSave = async () => {
+    if (!formData) {
+      toast.error("No data to save");
+      return;
+    }
+
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: {
+          portalId: currentPortalId,
+          dealId,
+          configType: "quote",
+          configuration: formData,
+        },
+      });
+
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save configuration");
+        return;
+      }
+
+      // Update savedConfig so tab switches preserve data
+      setSavedConfig(formData);
+      setLastSavedData(JSON.stringify(formData));
+      setHasUnsavedChanges(false);
+      // Clear both portal-scoped and legacy backup keys
+      localStorage.removeItem(`quote_backup_${currentPortalId}_${dealId}`);
+      localStorage.removeItem(`quote_backup_${dealId}`);
+
+      // Sync line items to HubSpot (replace all)
+      if (formData.lineItems && formData.lineItems.length > 0) {
+        // Create HubSpot products for manually-added items (id starts with "new-")
+        // that have a model or description filled in
+        const manualItems = formData.lineItems.filter(
+          (item) => item.id.startsWith("new-") && (item.model || item.description) && !(item as any).hs_product_id,
+        );
+        if (manualItems.length > 0) {
+          const updatedLineItems = [...formData.lineItems];
+          for (const item of manualItems) {
+            try {
+              const { data: productData } = await supabase.functions.invoke("hubspot-create-product", {
+                body: {
+                  portalId: currentPortalId,
+                  name: item.description || item.model,
+                  sku: item.model,
+                  description: item.description,
+                  price: item.msrp || item.price,
+                  unitCost: item.cost,
+                  productType: item.productType || "",
+                  dealer: item.dealerSource || "",
+                },
+              });
+              if (productData?.productId) {
+                // Update the line item with the HubSpot product ID
+                const idx = updatedLineItems.findIndex((li) => li.id === item.id);
+                if (idx >= 0) {
+                  updatedLineItems[idx] = { ...updatedLineItems[idx], hs_product_id: productData.productId } as any;
+                }
+              }
+            } catch (err) {
+              console.error("Failed to create product in HubSpot for:", item.model, err);
+            }
+          }
+          // Update formData with new hs_product_ids
+          setFormData((prev) => ({ ...prev, lineItems: updatedLineItems }));
+        }
+
+        try {
+          const { error: syncError } = await supabase.functions.invoke("hubspot-sync-line-items", {
+            body: {
+              portalId: currentPortalId,
+              dealId: dealId,
+              lineItems: formData.lineItems.map((item) => ({
+                hs_product_id: (item as any).hs_product_id || undefined,
+                model: item.model,
+                description: item.description,
+                quantity: item.quantity,
+                price: item.price,
+                cost: item.cost,
+                dealer: item.dealerSource || "",
+                productType: item.productType || "",
+                msrp: item.msrp || 0,
+                itemNumber: item.itemNumber || "",
+              })),
+            },
+          });
+
+          if (syncError) {
+            console.error("Line item sync error:", syncError);
+          }
+        } catch (syncErr) {
+          console.error("Line item sync error:", syncErr);
+        }
+      }
+
+      // Update deal properties in HubSpot (amount + financing)
+      try {
+        const dealProperties: Record<string, string> = {};
+        // Only push deal amount for non-rental quotes (rental total is unknown upfront)
+        if (formData.leaseProgram !== "rental" && formData.retailPrice > 0) {
+          dealProperties.amount = formData.retailPrice.toString();
+        }
+        if (formData.buyoutFinancingAmount > 0) {
+          dealProperties.financing_amount = formData.buyoutFinancingAmount.toString();
+        }
+
+        const { error: hubspotError } = await supabase.functions.invoke("hubspot-update-deal", {
+          body: {
+            portalId: currentPortalId,
+            dealId: dealId,
+            properties: dealProperties,
+          },
+        });
+
+        if (hubspotError) {
+          console.error("HubSpot deal update error:", hubspotError);
+        }
+      } catch (hsErr) {
+        console.error("HubSpot sync error:", hsErr);
+      }
+
+      // Stamp last-app-activity on save. Isolated from the write above and
+      // non-blocking, so a missing property can never fail the save.
+      pushLastAppActivity();
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save configuration");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleInstallationLineItemSwitch = async (newLineItemId: string, currentFormData: InstallationFormData) => {
+    // Save the current line item's data before switching
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+
+    if (currentPortalId && dealId && currentFormData.selectedLineItemId) {
+      try {
+        await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "installation",
+            lineItemId: currentFormData.selectedLineItemId,
+            configuration: currentFormData,
+          },
+        });
+
+        // Update saved config cache
+        setInstallationSavedConfig((prev) => ({
+          ...prev,
+          [currentFormData.selectedLineItemId]: currentFormData,
+        }));
+      } catch (err) {
+        console.error("Auto-save on switch error:", err);
+      }
+    }
+  };
+
+  const handleInstallationSave = async () => {
+    if (!installationFormData || !installationFormData.selectedLineItemId) {
+      toast.error("Please select a hardware item first");
+      return;
+    }
+
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+
+    setInstallationSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: {
+          portalId: currentPortalId,
+          dealId,
+          configType: "installation",
+          lineItemId: installationFormData.selectedLineItemId,
+          configuration: installationFormData,
+        },
+      });
+
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save installation configuration");
+        return;
+      }
+
+      // Update saved config cache so tab switches preserve data
+      setInstallationSavedConfig((prev) => ({
+        ...prev,
+        [installationFormData.selectedLineItemId]: installationFormData,
+      }));
+      setInstallationLastSavedData(JSON.stringify(installationFormData));
+      setInstallationHasUnsavedChanges(false);
+      toast.success("Installation configuration saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save installation configuration");
+    } finally {
+      setInstallationSaving(false);
+    }
+  };
+
+  // Helper function for multi-page PDF generation
+  const generateMultiPagePDF = async (element: HTMLElement): Promise<jsPDF> => {
+    const tempContainer = document.createElement("div");
+    tempContainer.style.position = "absolute";
+    tempContainer.style.left = "-9999px";
+    tempContainer.style.top = "0";
+    document.body.appendChild(tempContainer);
+
+    const clone = element.cloneNode(true) as HTMLElement;
+    tempContainer.appendChild(clone);
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Measure "keep together" regions (e.g. signature / terms blocks) relative to the
+    // clone BEFORE rasterizing, so we can avoid splitting them across a page break.
+    const cloneRect = clone.getBoundingClientRect();
+    const keepTogetherCssRanges: Array<{ top: number; bottom: number }> = [];
+    const keepEls = clone.querySelectorAll("[data-pdf-keep-together]");
+    keepEls.forEach((el) => {
+      const r = (el as HTMLElement).getBoundingClientRect();
+      keepTogetherCssRanges.push({ top: r.top - cloneRect.top, bottom: r.bottom - cloneRect.top });
+    });
+
+    const canvas = await html2canvas(clone, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+    });
+
+    // CSS px -> canvas px ratio (html2canvas scale applied)
+    const cssToCanvas = cloneRect.width > 0 ? canvas.width / cloneRect.width : 2;
+
+    document.body.removeChild(tempContainer);
+
+    // US Letter dimensions in inches
+    const pageWidthIn = 8.5;
+    const pageHeightIn = 11;
+
+    // Page margins (Task 10): keep content off the very top/bottom edges on every page.
+    const marginTopIn = 0.35;
+    const marginBottomIn = 0.5;
+    const usableHeightIn = pageHeightIn - marginTopIn - marginBottomIn;
+
+    // Calculate exact pixels-per-inch from the rendered canvas
+    const pxPerInch = canvas.width / pageWidthIn;
+    const usableHeightPx = Math.floor(pxPerInch * usableHeightIn);
+
+    // Total content height in inches
+    const contentHeightIn = canvas.height / pxPerInch;
+
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "in",
+      format: "letter",
+    });
+
+    // Keep-together ranges in canvas px
+    const keepRanges = keepTogetherCssRanges
+      .map((r) => ({ top: r.top * cssToCanvas, bottom: r.bottom * cssToCanvas }))
+      .sort((a, b) => a.top - b.top);
+
+    // Given a tentative page-end boundary (canvas px), pull it earlier if it would split
+    // a keep-together block that is small enough to fit on a single page on its own.
+    const adjustBoundary = (start: number, tentativeEnd: number): number => {
+      for (const range of keepRanges) {
+        const fitsOnePage = range.bottom - range.top <= usableHeightPx;
+        const straddles = range.top < tentativeEnd && range.bottom > tentativeEnd;
+        // Only break before the block if some of it already started on this page
+        if (fitsOnePage && straddles && range.top > start) {
+          return Math.floor(range.top);
+        }
+      }
+      return tentativeEnd;
+    };
+
+    if (contentHeightIn <= usableHeightIn && keepRanges.length === 0) {
+      // Single page - render at actual height (no stretch), within the top margin
+      const imgData = canvas.toDataURL("image/jpeg", 0.9);
+      pdf.addImage(imgData, "JPEG", 0, marginTopIn, pageWidthIn, contentHeightIn);
+    } else {
+      // Multi-page: slice at page boundaries (variable, to honor keep-together blocks)
+      let sourceY = 0;
+      let safety = 0;
+      while (sourceY < canvas.height && safety < 200) {
+        safety++;
+        let tentativeEnd = Math.min(sourceY + usableHeightPx, canvas.height);
+        if (tentativeEnd < canvas.height) {
+          tentativeEnd = adjustBoundary(sourceY, tentativeEnd);
+        }
+        const sourceH = tentativeEnd - sourceY;
+        if (sourceH <= 0) break;
+        const destH = sourceH / pxPerInch; // Actual height in inches (no stretch)
+
+        if (sourceY > 0) pdf.addPage();
+
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sourceH;
+
+        const ctx = pageCanvas.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, sourceH);
+          ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceH, 0, 0, canvas.width, sourceH);
+        }
+
+        const pageImgData = pageCanvas.toDataURL("image/jpeg", 0.9);
+        pdf.addImage(pageImgData, "JPEG", 0, marginTopIn, pageWidthIn, destH);
+
+        sourceY = tentativeEnd;
+      }
+    }
+
+    // Page numbering (Task 12): "Page X of Y" in the bottom margin, multi-page only.
+    const pageCount = pdf.getNumberOfPages();
+    if (pageCount > 1) {
+      pdf.setFontSize(8);
+      pdf.setTextColor(120);
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.text(`Page ${i} of ${pageCount}`, pageWidthIn / 2, pageHeightIn - 0.22, { align: "center" });
+      }
+      pdf.setTextColor(0);
+    }
+
+    return pdf;
+  };
+
+  // Quote versioning functions
+  const loadQuoteVersions = async () => {
+    const currentPortalId = portalId;
+    const currentDealId = deal?.hsObjectId;
+    if (!currentPortalId || !currentDealId) return;
+
+    setLoadingVersions(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("quote-versions", {
+        body: { action: "list_versions", portalId: currentPortalId, dealId: currentDealId },
+      });
+      if (!error && data) {
+        setQuoteVersions(data.versions || []);
+        setCurrentQuoteNumber(data.currentQuoteNumber || null);
+        setCurrentVersionId(data.currentVersionId || null);
+        // Keep the rendered quote number (preview + PDF read formData.quoteNumber)
+        // in sync with the canonical versioning number so the app badge, the
+        // on-screen preview, and the generated PDF never diverge.
+        if (data.currentQuoteNumber) {
+          setFormData((prev) =>
+            prev && prev.quoteNumber !== data.currentQuoteNumber
+              ? { ...prev, quoteNumber: data.currentQuoteNumber }
+              : prev,
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load quote versions:", err);
+    } finally {
+      setLoadingVersions(false);
+    }
+  };
+
+  const saveQuoteVersion = async (config: any, label?: string): Promise<string | null> => {
+    const currentPortalId = portalId;
+    const currentDealId = deal?.hsObjectId;
+    if (!currentPortalId || !currentDealId) return null;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("quote-versions", {
+        body: {
+          action: "save_version",
+          portalId: currentPortalId,
+          dealId: currentDealId,
+          configuration: config,
+          label,
+          userId: userId || undefined,
+        },
+      });
+      if (!error && data?.quoteNumber) {
+        await loadQuoteVersions();
+        return data.quoteNumber;
+      }
+    } catch (err) {
+      console.error("Failed to save quote version:", err);
+    }
+    return null;
+  };
+
+  const restoreQuoteVersion = async (versionId: string) => {
+    const currentPortalId = portalId;
+    const currentDealId = deal?.hsObjectId;
+    if (!currentPortalId || !currentDealId) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("quote-versions", {
+        body: {
+          action: "restore_version",
+          portalId: currentPortalId,
+          dealId: currentDealId,
+          versionId,
+          userId: userId || undefined,
+        },
+      });
+      if (!error && data?.configuration) {
+        // The versioning backend is the source of truth for the quote number.
+        // Overwrite the restored configuration's quoteNumber with the canonical
+        // value so the preview/PDF (which read formData.quoteNumber) match the
+        // app badge (which reads currentQuoteNumber).
+        const canonicalNumber = data.quoteNumber || data.configuration.quoteNumber;
+        const restoredConfig = { ...data.configuration, quoteNumber: canonicalNumber };
+        setSavedConfig(restoredConfig);
+        setFormData(restoredConfig);
+        setCurrentQuoteNumber(canonicalNumber);
+        setCurrentVersionId(versionId);
+        setHasUnsavedChanges(false);
+        toast.success(`Restored ${canonicalNumber}`);
+      }
+    } catch (err) {
+      console.error("Failed to restore version:", err);
+      toast.error("Failed to restore version");
+    }
+  };
+
+  const deleteQuoteVersion = async (versionId: string, quoteNumber: string) => {
+    if (!confirm(`Delete version ${quoteNumber}? This cannot be undone.`)) return;
+    const currentPortalId = portalId;
+    const currentDealId = deal?.hsObjectId;
+    if (!currentPortalId || !currentDealId) return;
+
+    try {
+      const { error } = await supabase.functions.invoke("quote-versions", {
+        body: {
+          action: "delete_version",
+          portalId: currentPortalId,
+          dealId: currentDealId,
+          versionId,
+          userId: userId || undefined,
+        },
+      });
+      if (!error) {
+        await loadQuoteVersions();
+        if (currentVersionId === versionId) {
+          setCurrentVersionId(null);
+        }
+        toast.success(`Deleted ${quoteNumber}`);
+      }
+    } catch (err) {
+      console.error("Failed to delete version:", err);
+      toast.error("Failed to delete version");
+    }
+  };
+
+  // Quote template functions
+  const loadQuoteTemplates = async () => {
+    const currentPortalId = portalId;
+    if (!currentPortalId) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("quote-templates", {
+        body: { action: "list_templates", portalId: currentPortalId, userId: userId || undefined },
+      });
+      if (!error && data?.templates) {
+        setQuoteTemplates(data.templates);
+      }
+    } catch (err) {
+      console.error("Failed to load templates:", err);
+    }
+  };
+
+  const saveQuoteTemplate = async () => {
+    if (!formData || !templateName.trim()) {
+      toast.error("Please enter a template name");
+      return;
+    }
+    const currentPortalId = portalId;
+    if (!currentPortalId) return;
+
+    try {
+      const { error } = await supabase.functions.invoke("quote-templates", {
+        body: {
+          action: "save_template",
+          portalId: currentPortalId,
+          name: templateName.trim(),
+          configuration: formData,
+          shared: templateShared,
+          userId: userId || undefined,
+          userName: formData.preparedBy || undefined,
+        },
+      });
+      if (!error) {
+        toast.success(`Template "${templateName}" saved`);
+        setShowSaveTemplateDialog(false);
+        setTemplateName("");
+        await loadQuoteTemplates();
+      } else {
+        toast.error("Failed to save template");
+      }
+    } catch (err) {
+      console.error("Failed to save template:", err);
+      toast.error("Failed to save template");
+    }
+  };
+
+  const loadQuoteTemplate = async (templateId: string) => {
+    const currentPortalId = portalId;
+    if (!currentPortalId) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("quote-templates", {
+        body: { action: "load_template", portalId: currentPortalId, templateId },
+      });
+      if (!error && data?.configuration) {
+        // Merge template config with current customer-specific fields
+        const customerFields = {
+          quoteNumber: formData?.quoteNumber || "",
+          quoteDate: formData?.quoteDate || new Date().toISOString().split("T")[0],
+          companyName: formData?.companyName || "",
+          address: formData?.address || "",
+          address2: formData?.address2 || "",
+          city: formData?.city || "",
+          state: formData?.state || "",
+          zip: formData?.zip || "",
+          phone: formData?.phone || "",
+          preparedBy: formData?.preparedBy || "",
+          preparedByEmail: formData?.preparedByEmail || "",
+          preparedByPhone: formData?.preparedByPhone || "",
+          rfpNumber: formData?.rfpNumber || "",
+          contractNumber: formData?.contractNumber || "",
+          showFinancingProvider: formData?.showFinancingProvider ?? true,
+        };
+        const merged = { ...data.configuration, ...customerFields };
+        // Set both formData AND savedConfig so QuoteForm's initialization
+        // useEffect treats the template as the saved state (won't overwrite with HubSpot data)
+        setFormData(merged);
+        setSavedConfig(merged);
+        setHasUnsavedChanges(true);
+        setShowTemplateDialog(false);
+        toast.success(`Loaded template "${data.template.name}"`);
+      }
+    } catch (err) {
+      console.error("Failed to load template:", err);
+      toast.error("Failed to load template");
+    }
+  };
+
+  const deleteQuoteTemplate = async (templateId: string) => {
+    const currentPortalId = portalId;
+    if (!currentPortalId) return;
+
+    try {
+      const { error } = await supabase.functions.invoke("quote-templates", {
+        body: { action: "delete_template", portalId: currentPortalId, templateId },
+      });
+      if (!error) {
+        toast.success("Template deleted");
+        await loadQuoteTemplates();
+      }
+    } catch (err) {
+      console.error("Failed to delete template:", err);
+    }
+  };
+
+  // Feedback system functions
+  const loadFeedback = async () => {
+    const currentPortalId = portalId;
+    if (!currentPortalId) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("app-feedback", {
+        body: { action: "list", portalId: currentPortalId },
+      });
+      if (!error && data?.feedback) {
+        setFeedbackList(data.feedback);
+      }
+    } catch (err) {
+      console.error("Failed to load feedback:", err);
+    }
+  };
+
+  const submitFeedback = async () => {
+    if (!feedbackTitle.trim()) {
+      toast.error("Please enter a title");
+      return;
+    }
+    const currentPortalId = portalId;
+    if (!currentPortalId) return;
+
+    try {
+      const { error } = await supabase.functions.invoke("app-feedback", {
+        body: {
+          action: "submit",
+          portalId: currentPortalId,
+          title: feedbackTitle.trim(),
+          description: feedbackDescription.trim(),
+          type: feedbackType,
+          userId: userId || undefined,
+          userName: formData?.preparedBy || undefined,
+        },
+      });
+      if (!error) {
+        toast.success("Feedback submitted — thank you!");
+        setFeedbackTitle("");
+        setFeedbackDescription("");
+        setShowFeedbackForm(false);
+        await loadFeedback();
+      } else {
+        toast.error("Failed to submit feedback");
+      }
+    } catch (err) {
+      console.error("Failed to submit feedback:", err);
+      toast.error("Failed to submit feedback");
+    }
+  };
+
+  const handleGeneratePDF = async () => {
+    if (!previewRef.current || !formData) {
+      toast.error("Please fill in the quote details first");
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      // Save a new version and get the new quote number
+      const newQuoteNumber = await saveQuoteVersion(formData);
+      if (newQuoteNumber && formData.quoteNumber !== newQuoteNumber) {
+        // Update React state for UI (app badge + on-screen preview)
+        const updatedFormData = { ...formData, quoteNumber: newQuoteNumber };
+        setFormData(updatedFormData);
+        setCurrentQuoteNumber(newQuoteNumber);
+        // Also directly set the DOM text to avoid any React timing issues at
+        // capture time. Patch ALL tagged occurrences, not just the first, so
+        // the captured PDF can never show a stale number.
+        const quoteNumEls = previewRef.current?.querySelectorAll("[data-quote-number]");
+        quoteNumEls?.forEach((el) => {
+          el.textContent = newQuoteNumber;
+        });
+        // Wait for any layout reflow
+        await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 150)));
+      }
+
+      const quotePdf = await generateMultiPagePDF(previewRef.current);
+
+      const sanitizedCompanyName = (formData.companyName || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      const now = new Date();
+      const dateStr = now.toISOString().split("T")[0];
+      const timeStr = now.toTimeString().slice(0, 5).replace(":", "-");
+      const fileName = `Quote_${sanitizedCompanyName}_${dateStr}_${timeStr}.pdf`;
+
+      let finalPdfBytes: ArrayBuffer;
+      // Proposal template merge is disabled — generate quote PDF only
+      finalPdfBytes = quotePdf.output("arraybuffer");
+
+      // Download the final PDF
+      const blob = new Blob([finalPdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      const currentPortalId = portalId;
+      const currentDealId = deal?.hsObjectId;
+
+      if (currentPortalId && currentDealId) {
+        try {
+          // Convert to base64 for HubSpot attachment
+          const uint8Array = new Uint8Array(finalPdfBytes);
+          let binary = "";
+          uint8Array.forEach((byte) => (binary += String.fromCharCode(byte)));
+          const pdfBase64 = btoa(binary);
+
+          const { data, error: attachError } = await supabase.functions.invoke("hubspot-attach-file", {
+            body: {
+              portalId: currentPortalId,
+              dealId: currentDealId,
+              fileName: fileName,
+              fileBase64: pdfBase64,
+            },
+          });
+
+          if (attachError || data?.error) {
+            toast.success("PDF downloaded! (Could not attach to deal)");
+          } else {
+            toast.success("PDF downloaded and attached to deal!");
+          }
+        } catch (attachErr) {
+          console.error("Failed to attach to HubSpot:", attachErr);
+          toast.success("PDF downloaded! (Could not attach to deal)");
+        }
+      } else {
+        toast.success("Quote PDF downloaded successfully!");
+      }
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleInstallationGeneratePDF = async () => {
+    if (!installationPreviewRef.current || !installationFormData || !installationFormData.selectedLineItemId) {
+      toast.error("Please select a hardware item and fill in the details first");
+      return;
+    }
+
+    setInstallationGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(installationPreviewRef.current);
+
+      const sanitizedCompanyName = (installationFormData.shipToCompany || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      const now = new Date();
+      const dateStr = now.toISOString().split("T")[0];
+      const timeStr = now.toTimeString().slice(0, 5).replace(":", "-");
+      const fileName = `Installation_Report_${sanitizedCompanyName}_Hardware_${dateStr}_${timeStr}.pdf`;
+
+      pdf.save(fileName);
+
+      const currentPortalId = portalId;
+      const currentDealId = deal?.hsObjectId;
+
+      if (currentPortalId && currentDealId) {
+        try {
+          const pdfBase64 = pdf.output("datauristring").split(",")[1];
+
+          const { data, error: attachError } = await supabase.functions.invoke("hubspot-attach-file", {
+            body: {
+              portalId: currentPortalId,
+              dealId: currentDealId,
+              fileName: fileName,
+              fileBase64: pdfBase64,
+            },
+          });
+
+          if (attachError || data?.error) {
+            toast.success("PDF downloaded! (Could not attach to deal)");
+          } else {
+            toast.success("PDF downloaded and attached to deal!");
+          }
+        } catch (attachErr) {
+          console.error("Failed to attach to HubSpot:", attachErr);
+          toast.success("PDF downloaded! (Could not attach to deal)");
+        }
+      } else {
+        toast.success("Installation PDF downloaded successfully!");
+      }
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setInstallationGenerating(false);
+    }
+  };
+
+  const handlePreview = () => {
+    if (!formData) {
+      toast.error("Please fill in the quote details first");
+      return;
+    }
+    setShowPreview(true);
+  };
+
+  const handleInstallationPreview = () => {
+    if (!installationFormData || !installationFormData.selectedLineItemId) {
+      toast.error("Please select a hardware item first");
+      return;
+    }
+    setShowInstallationPreview(true);
+  };
+
+  // Service Agreement handlers
+  const handleServiceAgreementSave = async () => {
+    if (!serviceAgreementFormData) {
+      toast.error("No data to save");
+      return;
+    }
+
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+
+    setServiceAgreementSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: {
+          portalId: currentPortalId,
+          dealId,
+          configType: "service_agreement",
+          configuration: serviceAgreementFormData,
+        },
+      });
+
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save service agreement configuration");
+        return;
+      }
+
+      setServiceAgreementLastSavedData(JSON.stringify(serviceAgreementFormData));
+      setServiceAgreementHasUnsavedChanges(false);
+      setServiceAgreementSavedConfig(serviceAgreementFormData);
+      toast.success("Service agreement configuration saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save service agreement configuration");
+    } finally {
+      setServiceAgreementSaving(false);
+    }
+  };
+
+  const handleServiceAgreementGeneratePDF = async () => {
+    if (!serviceAgreementPreviewRef.current || !serviceAgreementFormData) {
+      toast.error("Please fill in the service agreement details first");
+      return;
+    }
+
+    setServiceAgreementGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(serviceAgreementPreviewRef.current);
+
+      const sanitizedCompanyName = (serviceAgreementFormData.shipToCompany || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      const now = new Date();
+      const dateStr = now.toISOString().split("T")[0];
+      const timeStr = now.toTimeString().slice(0, 5).replace(":", "-");
+      const fileName = `Service_Agreement_${sanitizedCompanyName}_${dateStr}_${timeStr}.pdf`;
+
+      pdf.save(fileName);
+
+      const currentPortalId = portalId;
+      const currentDealId = deal?.hsObjectId;
+
+      if (currentPortalId && currentDealId) {
+        try {
+          const pdfBase64 = pdf.output("datauristring").split(",")[1];
+
+          const { data, error: attachError } = await supabase.functions.invoke("hubspot-attach-file", {
+            body: {
+              portalId: currentPortalId,
+              dealId: currentDealId,
+              fileName: fileName,
+              fileBase64: pdfBase64,
+            },
+          });
+
+          if (attachError || data?.error) {
+            toast.success("PDF downloaded! (Could not attach to deal)");
+          } else {
+            toast.success("PDF downloaded and attached to deal!");
+          }
+        } catch (attachErr) {
+          console.error("Failed to attach to HubSpot:", attachErr);
+          toast.success("PDF downloaded! (Could not attach to deal)");
+        }
+      } else {
+        toast.success("Service Agreement PDF downloaded successfully!");
+      }
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setServiceAgreementGenerating(false);
+    }
+  };
+
+  const handleServiceAgreementPreview = () => {
+    if (!serviceAgreementFormData) {
+      toast.error("Please fill in the service agreement details first");
+      return;
+    }
+    setShowServiceAgreementPreview(true);
+  };
+
+  // FMV Lease handlers
+  const handleFMVLeaseSave = async () => {
+    if (!fmvLeaseFormData) {
+      toast.error("No data to save");
+      return;
+    }
+
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+
+    setFmvLeaseSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: {
+          portalId: currentPortalId,
+          dealId,
+          configType: "fmv_lease",
+          configuration: fmvLeaseFormData,
+        },
+      });
+
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save FMV lease configuration");
+        return;
+      }
+
+      setFmvLeaseLastSavedData(JSON.stringify(fmvLeaseFormData));
+      setFmvLeaseHasUnsavedChanges(false);
+      setFmvLeaseSavedConfig(fmvLeaseFormData);
+      toast.success("FMV lease configuration saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save FMV lease configuration");
+    } finally {
+      setFmvLeaseSaving(false);
+    }
+  };
+
+  const handleFMVLeaseGeneratePDF = async () => {
+    if (!fmvLeasePreviewRef.current || !fmvLeaseFormData) {
+      toast.error("Please fill in the FMV lease details first");
+      return;
+    }
+
+    setFmvLeaseGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(fmvLeasePreviewRef.current);
+
+      const sanitizedCompanyName = (fmvLeaseFormData.companyLegalName || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      const now = new Date();
+      const dateStr = now.toISOString().split("T")[0];
+      const timeStr = now.toTimeString().slice(0, 5).replace(":", "-");
+      const fileName = `FMV_Lease_${sanitizedCompanyName}_${dateStr}_${timeStr}.pdf`;
+
+      pdf.save(fileName);
+
+      const currentPortalId = portalId;
+      const currentDealId = deal?.hsObjectId;
+
+      if (currentPortalId && currentDealId) {
+        try {
+          const pdfBase64 = pdf.output("datauristring").split(",")[1];
+
+          const { data, error: attachError } = await supabase.functions.invoke("hubspot-attach-file", {
+            body: {
+              portalId: currentPortalId,
+              dealId: currentDealId,
+              fileName: fileName,
+              fileBase64: pdfBase64,
+            },
+          });
+
+          if (attachError || data?.error) {
+            toast.success("PDF downloaded! (Could not attach to deal)");
+          } else {
+            toast.success("PDF downloaded and attached to deal!");
+          }
+        } catch (attachErr) {
+          console.error("Failed to attach to HubSpot:", attachErr);
+          toast.success("PDF downloaded! (Could not attach to deal)");
+        }
+      } else {
+        toast.success("FMV Lease PDF downloaded successfully!");
+      }
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setFmvLeaseGenerating(false);
+    }
+  };
+
+  const handleFMVLeasePreview = () => {
+    if (!fmvLeaseFormData) {
+      toast.error("Please fill in the FMV lease details first");
+      return;
+    }
+    setShowFMVLeasePreview(true);
+  };
+
+  // Lease Funding handlers
+  const handleLeaseFundingLineItemSwitch = async (newLineItemId: string, currentFormData: LeaseFundingFormData) => {
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+
+    if (currentPortalId && dealId && currentFormData.selectedLineItemId) {
+      try {
+        await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "lease_funding",
+            lineItemId: currentFormData.selectedLineItemId,
+            configuration: currentFormData,
+          },
+        });
+
+        // Update saved config cache
+        setLeaseFundingSavedConfig((prev) => ({
+          ...prev,
+          [currentFormData.selectedLineItemId]: currentFormData,
+        }));
+      } catch (err) {
+        console.error("Auto-save on switch error:", err);
+      }
+    }
+  };
+
+  const handleLeaseFundingSave = async () => {
+    if (!leaseFundingFormData || !leaseFundingFormData.selectedLineItemId) {
+      toast.error("Please select a hardware item first");
+      return;
+    }
+
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+
+    setLeaseFundingSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: {
+          portalId: currentPortalId,
+          dealId,
+          configType: "lease_funding",
+          lineItemId: leaseFundingFormData.selectedLineItemId,
+          configuration: leaseFundingFormData,
+        },
+      });
+
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save lease funding configuration");
+        return;
+      }
+
+      // Update saved config cache
+      setLeaseFundingSavedConfig((prev) => ({
+        ...prev,
+        [leaseFundingFormData.selectedLineItemId]: leaseFundingFormData,
+      }));
+      setLeaseFundingLastSavedData(JSON.stringify(leaseFundingFormData));
+      setLeaseFundingHasUnsavedChanges(false);
+      toast.success("Lease funding configuration saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save lease funding configuration");
+    } finally {
+      setLeaseFundingSaving(false);
+    }
+  };
+
+  const handleLeaseFundingGeneratePDF = async () => {
+    if (!leaseFundingPreviewRef.current || !leaseFundingFormData || !leaseFundingFormData.selectedLineItemId) {
+      toast.error("Please select a hardware item and fill in the details first");
+      return;
+    }
+
+    setLeaseFundingGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(leaseFundingPreviewRef.current);
+
+      const sanitizedCompanyName = (leaseFundingFormData.customerName || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      const now = new Date();
+      const dateStr = now.toISOString().split("T")[0];
+      const timeStr = now.toTimeString().slice(0, 5).replace(":", "-");
+      const fileName = `Lease_Funding_${sanitizedCompanyName}_${dateStr}_${timeStr}.pdf`;
+
+      pdf.save(fileName);
+
+      const currentPortalId = portalId;
+      const currentDealId = deal?.hsObjectId;
+
+      if (currentPortalId && currentDealId) {
+        try {
+          const pdfBase64 = pdf.output("datauristring").split(",")[1];
+
+          const { data, error: attachError } = await supabase.functions.invoke("hubspot-attach-file", {
+            body: {
+              portalId: currentPortalId,
+              dealId: currentDealId,
+              fileName: fileName,
+              fileBase64: pdfBase64,
+            },
+          });
+
+          if (attachError || data?.error) {
+            toast.success("PDF downloaded! (Could not attach to deal)");
+          } else {
+            toast.success("PDF downloaded and attached to deal!");
+          }
+        } catch (attachErr) {
+          console.error("Failed to attach to HubSpot:", attachErr);
+          toast.success("PDF downloaded! (Could not attach to deal)");
+        }
+      } else {
+        toast.success("Lease Funding PDF downloaded successfully!");
+      }
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setLeaseFundingGenerating(false);
+    }
+  };
+
+  const handleLeaseFundingPreview = () => {
+    if (!leaseFundingFormData || !leaseFundingFormData.selectedLineItemId) {
+      toast.error("Please select a hardware item first");
+      return;
+    }
+    setShowLeaseFundingPreview(true);
+  };
+
+  // Lease Return handlers
+  const handleLeaseReturnSave = async () => {
+    if (!leaseReturnFormData) {
+      toast.error("No data to save");
+      return;
+    }
+
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+
+    setLeaseReturnSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: {
+          portalId: currentPortalId,
+          dealId,
+          configType: "lease_return",
+          configuration: leaseReturnFormData,
+        },
+      });
+
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save lease return configuration");
+        return;
+      }
+
+      setLeaseReturnSavedConfig(leaseReturnFormData);
+      setLeaseReturnLastSavedData(JSON.stringify(leaseReturnFormData));
+      setLeaseReturnHasUnsavedChanges(false);
+      toast.success("Lease return configuration saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save lease return configuration");
+    } finally {
+      setLeaseReturnSaving(false);
+    }
+  };
+
+  const handleLeaseReturnGeneratePDF = async () => {
+    if (!leaseReturnPreviewRef.current || !leaseReturnFormData) {
+      toast.error("Please fill in the lease return details first");
+      return;
+    }
+
+    setLeaseReturnGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(leaseReturnPreviewRef.current);
+
+      const sanitizedCompanyName = (leaseReturnFormData.customerName || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      const now = new Date();
+      const dateStr = now.toISOString().split("T")[0];
+      const timeStr = now.toTimeString().slice(0, 5).replace(":", "-");
+      const fileName = `Lease_Return_${sanitizedCompanyName}_${dateStr}_${timeStr}.pdf`;
+
+      pdf.save(fileName);
+
+      const currentPortalId = portalId;
+      const currentDealId = deal?.hsObjectId;
+
+      if (currentPortalId && currentDealId) {
+        try {
+          const pdfBase64 = pdf.output("datauristring").split(",")[1];
+
+          const { data, error: attachError } = await supabase.functions.invoke("hubspot-attach-file", {
+            body: {
+              portalId: currentPortalId,
+              dealId: currentDealId,
+              fileName: fileName,
+              fileBase64: pdfBase64,
+            },
+          });
+
+          if (attachError || data?.error) {
+            toast.success("PDF downloaded! (Could not attach to deal)");
+          } else {
+            toast.success("PDF downloaded and attached to deal!");
+          }
+        } catch (attachErr) {
+          console.error("Failed to attach to HubSpot:", attachErr);
+          toast.success("PDF downloaded! (Could not attach to deal)");
+        }
+      } else {
+        toast.success("Lease Return PDF downloaded successfully!");
+      }
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setLeaseReturnGenerating(false);
+    }
+  };
+
+  const handleLeaseReturnPreview = () => {
+    if (!leaseReturnFormData) {
+      toast.error("Please fill in the lease return details first");
+      return;
+    }
+    setShowLeaseReturnPreview(true);
+  };
+
+  // Interterritorial handlers
+  const handleInterterritorialSave = async () => {
+    if (!interterritorialFormData) {
+      toast.error("No data to save");
+      return;
+    }
+
+    const currentPortalId = portalId;
+    const dealId = deal?.hsObjectId;
+
+    if (!currentPortalId || !dealId) {
+      toast.error("Missing portal or deal information");
+      return;
+    }
+
+    setInterterritorialSaving(true);
+    try {
+      const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+        body: {
+          portalId: currentPortalId,
+          dealId,
+          configType: "interterritorial",
+          configuration: interterritorialFormData,
+        },
+      });
+
+      if (saveError) {
+        console.error("Save error:", saveError);
+        toast.error("Failed to save interterritorial configuration");
+        return;
+      }
+
+      setInterterritorialSavedConfig(interterritorialFormData);
+      setInterterritorialLastSavedData(JSON.stringify(interterritorialFormData));
+      setInterterritorialHasUnsavedChanges(false);
+      toast.success("Interterritorial configuration saved");
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Failed to save interterritorial configuration");
+    } finally {
+      setInterterritorialSaving(false);
+    }
+  };
+
+  const handleInterterritorialGeneratePDF = async () => {
+    if (!interterritorialPreviewRef.current || !interterritorialFormData) {
+      toast.error("Please fill in the interterritorial details first");
+      return;
+    }
+
+    setInterterritorialGenerating(true);
+    try {
+      const pdf = await generateMultiPagePDF(interterritorialPreviewRef.current);
+
+      const sanitizedCompanyName = (interterritorialFormData.customerName || "Draft")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      const now = new Date();
+      const dateStr = now.toISOString().split("T")[0];
+      const timeStr = now.toTimeString().slice(0, 5).replace(":", "-");
+      const fileName = `Interterritorial_Request_${sanitizedCompanyName}_${dateStr}_${timeStr}.pdf`;
+
+      pdf.save(fileName);
+
+      const currentPortalId = portalId;
+      const currentDealId = deal?.hsObjectId;
+
+      if (currentPortalId && currentDealId) {
+        try {
+          const pdfBase64 = pdf.output("datauristring").split(",")[1];
+
+          const { data, error: attachError } = await supabase.functions.invoke("hubspot-attach-file", {
+            body: {
+              portalId: currentPortalId,
+              dealId: currentDealId,
+              fileName: fileName,
+              fileBase64: pdfBase64,
+            },
+          });
+
+          if (attachError || data?.error) {
+            toast.success("PDF downloaded! (Could not attach to deal)");
+          } else {
+            toast.success("PDF downloaded and attached to deal!");
+          }
+        } catch (attachErr) {
+          console.error("Failed to attach to HubSpot:", attachErr);
+          toast.success("PDF downloaded! (Could not attach to deal)");
+        }
+      } else {
+        toast.success("Interterritorial PDF downloaded successfully!");
+      }
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setInterterritorialGenerating(false);
+    }
+  };
+
+  const handleInterterritorialPreview = () => {
+    if (!interterritorialFormData) {
+      toast.error("Please fill in the interterritorial details first");
+      return;
+    }
+    setShowInterterritorialPreview(true);
+  };
+
+  // Get the saved config for the currently selected line item
+  const getCurrentInstallationSavedConfig = () => {
+    if (!installationFormData?.selectedLineItemId) return undefined;
+    return installationSavedConfig[installationFormData.selectedLineItemId];
+  };
+
+  // Get the saved config for the currently selected lease funding line item
+  const getCurrentLeaseFundingSavedConfig = () => {
+    if (!leaseFundingFormData?.selectedLineItemId) return undefined;
+    return leaseFundingSavedConfig[leaseFundingFormData.selectedLineItemId];
+  };
+
+  // Custom Document handlers
+  const handleCustomDocFormChange = useCallback((docId: string, data: Record<string, any>) => {
+    setCustomDocFormData((prev) => ({ ...prev, [docId]: data }));
+  }, []);
+
+  const handleCustomDocSave = useCallback(
+    async (docId: string) => {
+      const currentPortalId = portalId;
+      const dealId = deal?.hsObjectId;
+      const formDataToSave = customDocFormData[docId];
+
+      if (!currentPortalId || !dealId || !formDataToSave) {
+        toast.error("Missing required data for save");
+        return;
+      }
+
+      setCustomDocSaving((prev) => ({ ...prev, [docId]: true }));
+      try {
+        const { error: saveError } = await supabase.functions.invoke("save-configuration", {
+          body: {
+            portalId: currentPortalId,
+            dealId,
+            configType: "custom_document",
+            customDocumentId: docId,
+            configuration: formDataToSave,
+          },
+        });
+
+        if (saveError) {
+          console.error("Save error:", saveError);
+          toast.error("Failed to save custom document");
+          return;
+        }
+
+        setCustomDocSavedConfig((prev) => ({ ...prev, [docId]: formDataToSave }));
+        toast.success("Custom document saved");
+      } catch (err) {
+        console.error("Save error:", err);
+        toast.error("Failed to save custom document");
+      } finally {
+        setCustomDocSaving((prev) => ({ ...prev, [docId]: false }));
+      }
+    },
+    [portalId, deal?.hsObjectId, customDocFormData],
+  );
+
+  const handleCustomDocGeneratePDF = useCallback(
+    async (docId: string) => {
+      const previewRef = customDocPreviewRefs.current[docId];
+      const doc = customDocuments.find((d) => d.id === docId);
+
+      if (!previewRef || !doc) {
+        toast.error("Please configure the document first");
+        return;
+      }
+
+      setCustomDocGenerating((prev) => ({ ...prev, [docId]: true }));
+      try {
+        const canvas = await html2canvas(previewRef, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          allowTaint: true,
+        });
+
+        const pageWidthIn = 8.5;
+        const pageHeightIn = 11;
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        const aspectRatio = imgWidth / imgHeight;
+        const pdfWidth = pageWidthIn;
+        const pdfHeight = pdfWidth / aspectRatio;
+
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "in",
+          format: [pageWidthIn, pageHeightIn],
+        });
+
+        if (pdfHeight <= pageHeightIn) {
+          const imgData = canvas.toDataURL("image/jpeg", 0.85);
+          pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+        } else {
+          const totalPages = Math.ceil(pdfHeight / pageHeightIn);
+          const pixelsPerPage = canvas.height / totalPages;
+
+          for (let page = 0; page < totalPages; page++) {
+            if (page > 0) pdf.addPage();
+
+            const pageCanvas = document.createElement("canvas");
+            pageCanvas.width = canvas.width;
+            pageCanvas.height = pixelsPerPage;
+
+            const ctx = pageCanvas.getContext("2d");
+            if (ctx) {
+              ctx.drawImage(
+                canvas,
+                0,
+                page * pixelsPerPage,
+                canvas.width,
+                pixelsPerPage,
+                0,
+                0,
+                canvas.width,
+                pixelsPerPage,
+              );
+            }
+
+            const pageImgData = pageCanvas.toDataURL("image/jpeg", 0.85);
+            pdf.addImage(pageImgData, "JPEG", 0, 0, pageWidthIn, pageHeightIn);
+          }
+        }
+
+        const sanitizedName = doc.name.replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_");
+        const now = new Date();
+        const dateStr = now.toISOString().split("T")[0];
+        const fileName = `${sanitizedName}_${dateStr}.pdf`;
+
+        pdf.save(fileName);
+
+        const currentPortalId = portalId;
+        const currentDealId = deal?.hsObjectId;
+
+        if (currentPortalId && currentDealId) {
+          try {
+            const pdfBase64 = pdf.output("datauristring").split(",")[1];
+            const { error: attachError } = await supabase.functions.invoke("hubspot-attach-file", {
+              body: {
+                portalId: currentPortalId,
+                dealId: currentDealId,
+                fileName,
+                fileBase64: pdfBase64,
+              },
+            });
+
+            if (attachError) {
+              toast.success("PDF downloaded! (Could not attach to deal)");
+            } else {
+              toast.success("PDF downloaded and attached to deal!");
+            }
+          } catch (attachErr) {
+            console.error("Failed to attach to HubSpot:", attachErr);
+            toast.success("PDF downloaded! (Could not attach to deal)");
+          }
+        } else {
+          toast.success("PDF downloaded successfully!");
+        }
+      } catch (err) {
+        console.error("PDF generation error:", err);
+        toast.error("Failed to generate PDF");
+      } finally {
+        setCustomDocGenerating((prev) => ({ ...prev, [docId]: false }));
+      }
+    },
+    [customDocuments, portalId, deal?.hsObjectId],
+  );
+
+  const handleCustomDocPreview = useCallback((docId: string) => {
+    setShowCustomDocPreview((prev) => ({ ...prev, [docId]: true }));
+  }, []);
+
+  if (loading || !configsLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Card className="max-w-md">
+          <CardContent className="pt-6 text-center">
+            <p className="text-destructive mb-2">Failed to load deal data</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Count hardware items for badge
+  const hardwareLineItems = lineItems.filter((item) => item.category?.toLowerCase() === "hardware" || !item.category);
+
+  // Per-document status for the nav rail dots.
+  // 'in_progress' when a saved config exists for that doc, else 'not_started'.
+  // (A future 'ready' state can hook into generation tracking.)
+  const docStatusMap: Record<string, "not_started" | "in_progress" | "ready"> = {
+    quote: savedConfig ? "in_progress" : "not_started",
+    installation: Object.keys(installationSavedConfig || {}).length ? "in_progress" : "not_started",
+    service_agreement: serviceAgreementSavedConfig ? "in_progress" : "not_started",
+    fmv_lease: fmvLeaseSavedConfig ? "in_progress" : "not_started",
+    lease_funding: Object.keys(leaseFundingSavedConfig || {}).length ? "in_progress" : "not_started",
+    loi: loiSavedConfig ? "in_progress" : "not_started",
+    lease_return: leaseReturnSavedConfig ? "in_progress" : "not_started",
+    interterritorial: interterritorialSavedConfig ? "in_progress" : "not_started",
+    new_customer: newCustomerSavedConfig ? "in_progress" : "not_started",
+    relocation: relocationSavedConfig ? "in_progress" : "not_started",
+    equipment_removal: removalSavedConfig ? "in_progress" : "not_started",
+    commission: commissionSavedConfig ? "in_progress" : "not_started",
+  };
+  const getDocStatus = (code: string): "not_started" | "in_progress" | "ready" =>
+    docStatusMap[code] || (customDocSavedConfig?.[code] ? "in_progress" : "not_started");
+
+  // Nav rail grouping (presentation only; codes map to the same TabsTrigger values)
+  const navGroups: { label: string; codes: string[] }[] = [
+    { label: "Sales & onboarding", codes: ["quote", "loi", "new_customer"] },
+    { label: "Lease & finance", codes: ["fmv_lease", "lease_funding", "lease_return", "commission"] },
+    {
+      label: "Service & logistics",
+      codes: ["service_agreement", "installation", "relocation", "equipment_removal", "interterritorial"],
+    },
+  ];
+  const isFormEnabled = (code: string) =>
+    !dealerSettings.enabled_forms ||
+    dealerSettings.enabled_forms.length === 0 ||
+    dealerSettings.enabled_forms.includes(code);
+  const docByCode = (code: string) => documentTypes.find((d) => d.code === code);
+  const matchesNavSearch = (name: string) => !navSearch || name.toLowerCase().includes(navSearch.toLowerCase());
+  const statusDotClass = (status: string) =>
+    status === "ready" ? "bg-qbs-green-600" : status === "in_progress" ? "bg-qbs-gold-500" : "bg-qbs-neutral-300";
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-qbs-navy-800 text-white shadow-[0_1px_3px_rgba(27,42,77,0.25)]">
+        {/* subtle gold radial glow, top-left */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{ background: "radial-gradient(420px 120px at 0% 0%, rgba(196,155,85,0.18), transparent 70%)" }}
+        />
+        <div className="relative flex items-center justify-between h-[52px] px-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 flex items-center justify-center shrink-0">
+              <img src={quantumLogo} alt="Quantum Document Management" className="h-8 w-8 object-contain" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold tracking-tight leading-tight truncate">
+                Quantum Document Management
+              </div>
+              <div className="text-[11px] text-white/55 leading-tight truncate">Embedded · HubSpot deal record</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] text-white/80">
+              <span className="h-1.5 w-1.5 rounded-full bg-qbs-green-500" />
+              {loading ? "Syncing…" : "Synced"}
+            </span>
+            {/*
+              Show Settings for admins, OR when no user roles have been
+              configured yet for this portal. Without the second condition the
+              app locks everyone out of Settings before roles exist, since
+              Settings is where roles are managed. Once roles are configured
+              (with at least one admin) this reverts to admin-only automatically.
+            */}
+            {(userPermissions.is_admin || userPermissions.reason === "no_roles_configured") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-white/85 hover:text-white hover:bg-white/10"
+                onClick={() => setShowSettings(true)}
+              >
+                <Settings className="h-4 w-4 mr-1" />
+                Settings
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Deal-context bar */}
+      {deal && (
+        <div
+          className="border-b border-border px-4 py-2.5"
+          style={{ background: "linear-gradient(180deg, #FFFFFF 0%, #F1F4F9 100%)" }}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <h2 className="text-[17px] font-bold tracking-tight truncate text-qbs-navy">{deal.dealName}</h2>
+              <Badge className="text-[10px] font-medium px-2 py-0.5 rounded-md shrink-0 bg-qbs-navy text-white hover:bg-qbs-navy">
+                {deal.stage}
+              </Badge>
+              {(deal.hsObjectId || deal.id) && (
+                <span className="hidden sm:inline font-mono text-[11px] text-muted-foreground shrink-0">
+                  #{deal.hsObjectId || deal.id}
+                </span>
+              )}
+            </div>
+            {deal.amount && (
+              <div className="text-right shrink-0">
+                <div className="eyebrow leading-none">Deal Value</div>
+                <div className="text-base font-bold text-qbs-navy tabular-nums leading-tight">
+                  ${deal.amount.toLocaleString()}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1.5">
+            <div className="flex items-center gap-1.5">
+              <Building2 className="h-3 w-3" />
+              <span>{company?.name || "No company"}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <UserCircle className="h-3 w-3" />
+              <span>{dealOwner ? `${dealOwner.firstName} ${dealOwner.lastName}` : "No owner"}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <User className="h-3 w-3" />
+              <span>{contacts[0] ? `${contacts[0].firstName} ${contacts[0].lastName}` : "No contact"}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Package className="h-3 w-3" />
+              <span>
+                {lineItems.length} item{lineItems.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permission Banner */}
+      {!userPermissions.can_edit && userPermissions.reason !== "loading" && (
+        <div
+          className="mx-4 mt-3 px-3 py-2 rounded-lg text-xs flex items-center gap-2"
+          style={{ background: "var(--qbs-warning-bg)", color: "var(--qbs-gold-700)" }}
+        >
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          {userPermissions.can_view
+            ? "You have view-only access. Document editing and downloads are restricted at this stage."
+            : "Access to this deal is restricted. Contact your administrator for access."}
+        </div>
+      )}
+
+      <Tabs defaultValue="quote" className="w-full">
+        <div className="flex items-start gap-0">
+          {/* Collapsible nav rail (replaces the tab strip) */}
+          <aside
+            className={`group/rail sticky top-[52px] self-start h-[calc(100vh-52px)] shrink-0 border-r border-border bg-card overflow-hidden flex flex-col transition-[width] duration-200 ease-out ${navExpanded ? "w-[248px]" : "w-[62px] hover:w-[248px]"}`}
+          >
+            {/* Rail top: pin toggle + search */}
+            <div className="flex items-center gap-2 h-[46px] px-[15px] border-b border-border">
+              <button
+                type="button"
+                onClick={() => setNavExpanded((v) => !v)}
+                className="h-8 w-8 -ml-1 flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground shrink-0"
+                title={navExpanded ? "Collapse navigation" : "Pin navigation open"}
+                aria-label="Toggle navigation"
+              >
+                {navExpanded ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+              </button>
+              <div
+                className={`relative flex-1 transition-opacity duration-150 ${navExpanded ? "opacity-100" : "opacity-0 group-hover/rail:opacity-100"}`}
+              >
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  value={navSearch}
+                  onChange={(e) => setNavSearch(e.target.value)}
+                  placeholder="Search documents"
+                  className="w-full h-8 pl-7 pr-2 rounded-md border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-ring/30"
+                />
+              </div>
+            </div>
+
+            {/* Radix requires every TabsTrigger to live inside a TabsList (it mounts the
+                RovingFocusGroup). Pin + search stay ABOVE this so arrow-key roving focus
+                does not capture their inputs. The list is restyled into a vertical rail. */}
+            <TabsList className="!flex !flex-col flex-1 min-h-0 !h-auto !w-full !items-stretch !justify-start !gap-0 !rounded-none !bg-transparent !p-0 !shadow-none">
+              <div className="py-2 overflow-y-auto flex-1 min-h-0 w-full">
+                {navGroups.map((group) => {
+                  const items = group.codes
+                    .filter((code) => isFormEnabled(code))
+                    .map((code) => docByCode(code))
+                    .filter((d): d is { code: string; name: string; icon: typeof FileText } => !!d)
+                    .filter((d) => matchesNavSearch(d.name));
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={group.label} className="mb-1.5">
+                      <div
+                        className={`eyebrow px-4 h-5 flex items-center whitespace-nowrap overflow-hidden transition-opacity duration-150 ${navExpanded ? "opacity-100" : "opacity-0 group-hover/rail:opacity-100"}`}
+                      >
+                        {group.label}
+                      </div>
+                      {items.map((doc) => {
+                        const Icon = doc.icon;
+                        const status = getDocStatus(doc.code);
+                        return (
+                          <TabsTrigger
+                            key={doc.code}
+                            value={doc.code}
+                            className="group/item relative w-full justify-start rounded-none px-[19px] py-2 h-auto text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 data-[state=active]:bg-qbs-navy/[0.06] data-[state=active]:text-qbs-navy data-[state=active]:font-semibold data-[state=active]:shadow-none transition-colors"
+                          >
+                            <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-qbs-gold-500 opacity-0 group-data-[state=active]/item:opacity-100" />
+                            <Icon className="h-[18px] w-[18px] shrink-0" />
+                            <span
+                              className={`ml-3 whitespace-nowrap transition-opacity duration-150 ${navExpanded ? "opacity-100" : "opacity-0 group-hover/rail:opacity-100"}`}
+                            >
+                              {doc.name}
+                            </span>
+                            {doc.code === "installation" && hardwareLineItems.length > 0 && (
+                              <Badge
+                                variant="outline"
+                                className={`ml-1.5 text-[10px] px-1 py-0 transition-opacity duration-150 ${navExpanded ? "opacity-100" : "opacity-0 group-hover/rail:opacity-100"}`}
+                              >
+                                {hardwareLineItems.length}
+                              </Badge>
+                            )}
+                            <span
+                              className={`ml-auto h-1.5 w-1.5 rounded-full shrink-0 ${statusDotClass(status)} transition-opacity duration-150 ${navExpanded ? "opacity-100" : "opacity-0 group-hover/rail:opacity-100"}`}
+                            />
+                          </TabsTrigger>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+
+                {/* Custom documents */}
+                {customDocuments.filter((c) => matchesNavSearch(c.name)).length > 0 && (
+                  <div className="mb-1.5">
+                    <div
+                      className={`eyebrow px-4 h-5 flex items-center whitespace-nowrap overflow-hidden transition-opacity duration-150 ${navExpanded ? "opacity-100" : "opacity-0 group-hover/rail:opacity-100"}`}
+                    >
+                      Custom
+                    </div>
+                    {customDocuments
+                      .filter((c) => matchesNavSearch(c.name))
+                      .map((customDoc) => (
+                        <TabsTrigger
+                          key={customDoc.code}
+                          value={customDoc.code}
+                          className="group/item relative w-full justify-start rounded-none px-[19px] py-2 h-auto text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 data-[state=active]:bg-qbs-navy/[0.06] data-[state=active]:text-qbs-navy data-[state=active]:font-semibold data-[state=active]:shadow-none transition-colors"
+                        >
+                          <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-qbs-gold-500 opacity-0 group-data-[state=active]/item:opacity-100" />
+                          <DynamicIcon name={customDoc.icon} className="h-[18px] w-[18px] shrink-0" />
+                          <span
+                            className={`ml-3 whitespace-nowrap transition-opacity duration-150 ${navExpanded ? "opacity-100" : "opacity-0 group-hover/rail:opacity-100"}`}
+                          >
+                            {customDoc.name}
+                          </span>
+                          <span
+                            className={`ml-auto h-1.5 w-1.5 rounded-full shrink-0 ${statusDotClass(getDocStatus(customDoc.code))} transition-opacity duration-150 ${navExpanded ? "opacity-100" : "opacity-0 group-hover/rail:opacity-100"}`}
+                          />
+                        </TabsTrigger>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Pinned Document Packet footer - now a normal flex child INSIDE the TabsList
+                (no longer absolutely positioned) so its trigger stays in the RovingFocusGroup.
+                mt-auto pins it to the bottom of the flex column. */}
+              {isFormEnabled("document_packet") && (
+                <div className="mt-auto shrink-0 w-full h-[52px] border-t border-border bg-card flex items-center">
+                  <TabsTrigger
+                    value="document_packet"
+                    className="group/item relative w-full justify-start rounded-none px-[19px] py-2.5 h-auto text-xs text-qbs-gold-700 hover:bg-qbs-gold-100/60 data-[state=active]:bg-qbs-gold-100 data-[state=active]:text-qbs-gold-700 data-[state=active]:font-semibold data-[state=active]:shadow-none transition-colors"
+                  >
+                    <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-qbs-gold-500 opacity-0 group-data-[state=active]/item:opacity-100" />
+                    <Package className="h-[18px] w-[18px] shrink-0" />
+                    <span
+                      className={`ml-3 whitespace-nowrap font-medium transition-opacity duration-150 ${navExpanded ? "opacity-100" : "opacity-0 group-hover/rail:opacity-100"}`}
+                    >
+                      Document Packet
+                    </span>
+                  </TabsTrigger>
+                </div>
+              )}
+            </TabsList>
+          </aside>
+
+          {/* Content area */}
+          <div className="flex-1 min-w-0 px-4 py-4">
+            {/* Quote Tab Content */}
+            <TabsContent value="quote" className="mt-0">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold tracking-tight">Quote Builder</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Configure pricing, equipment, and lease options
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <QuoteForm
+                      standardTerms={dealerInfo?.termsAndConditions}
+                      deal={deal}
+                      company={company}
+                      contacts={contacts}
+                      lineItems={lineItems}
+                      dealOwner={dealOwner}
+                      onFormChange={handleFormChange}
+                      portalId={portalId || undefined}
+                      savedConfig={savedConfig || undefined}
+                      formCustomization={dealerSettings.form_customization?.quote}
+                    />
+
+                    {/* Quote number, versions & actions */}
+                    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="eyebrow text-muted-foreground">Quote #</span>
+                          <span className="text-sm font-bold text-primary bg-primary/5 px-2 py-0.5 rounded truncate">
+                            {currentQuoteNumber || formData?.quoteNumber || "—"}
+                          </span>
+                        </div>
+                        {quoteVersions.length > 0 && (
+                          <Badge variant="secondary" className="text-[10px] shrink-0">
+                            {quoteVersions.length} version{quoteVersions.length !== 1 ? "s" : ""}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {quoteVersions.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {quoteVersions.map((v) => (
+                            <div key={v.id} className="relative group inline-flex">
+                              <Button
+                                variant={v.id === currentVersionId ? "default" : "outline"}
+                                size="sm"
+                                className={`text-xs h-7 transition-all pr-6 ${v.id === currentVersionId ? "shadow-sm" : "hover:border-primary/50"}`}
+                                onClick={() => restoreQuoteVersion(v.id)}
+                                disabled={v.id === currentVersionId}
+                                title={`Created: ${new Date(v.created_at).toLocaleString()}`}
+                              >
+                                {v.quote_number}
+                                <span className="ml-1 opacity-50 text-[10px]">
+                                  {new Date(v.created_at).toLocaleDateString()}
+                                </span>
+                              </Button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteQuoteVersion(v.id, v.quote_number);
+                                }}
+                                className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[8px] hover:bg-destructive/80"
+                                title={`Delete ${v.quote_number}`}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">
+                          A new quote number will be assigned when you Generate PDF.
+                        </p>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 pt-3 border-t border-border/60">
+                        <Button variant="default" size="sm" onClick={handleSave} disabled={saving} className="gap-2">
+                          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          {saving ? "Saving..." : "Save"}
+                        </Button>
+                        <div className="ml-auto flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => setShowTemplateDialog(true)}
+                          >
+                            <FolderOpen className="h-3.5 w-3.5 mr-1" />
+                            Load template
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => {
+                              setTemplateName("");
+                              setTemplateShared(true);
+                              setShowSaveTemplateDialog(true);
+                            }}
+                          >
+                            <BookTemplate className="h-3.5 w-3.5 mr-1" />
+                            Save as template
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Save Template Dialog */}
+                    {showSaveTemplateDialog && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 w-96 space-y-4 border animate-in fade-in zoom-in-95 duration-200">
+                          <h3 className="text-sm font-semibold">Save as Quote Template</h3>
+                          <p className="text-xs text-muted-foreground">
+                            Saves the current line items, pricing, markups, accessories, relationships, and lease
+                            settings. Customer-specific info (name, address, contact) is excluded.
+                          </p>
+                          <div>
+                            <Label className="text-xs">Template Name</Label>
+                            <Input
+                              value={templateName}
+                              onChange={(e) => setTemplateName(e.target.value)}
+                              placeholder="e.g., Canon C5560i + Tray + Finisher"
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="templateShared"
+                              checked={templateShared}
+                              onChange={(e) => setTemplateShared(e.target.checked)}
+                            />
+                            <Label htmlFor="templateShared" className="text-xs">
+                              Share with all reps
+                            </Label>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button variant="outline" size="sm" onClick={() => setShowSaveTemplateDialog(false)}>
+                              Cancel
+                            </Button>
+                            <Button size="sm" onClick={saveQuoteTemplate} disabled={!templateName.trim()}>
+                              Save Template
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Load Template Dialog */}
+                    {showTemplateDialog && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 w-[500px] max-h-[70vh] flex flex-col border animate-in fade-in zoom-in-95 duration-200">
+                          <h3 className="text-sm font-semibold mb-3">Load Quote Template</h3>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Select a template to pre-fill line items, pricing, and configuration. Your customer info
+                            will be preserved.
+                          </p>
+                          <div className="overflow-y-auto flex-1 space-y-2">
+                            {quoteTemplates.length === 0 && (
+                              <p className="text-sm text-muted-foreground text-center py-8">
+                                No templates saved yet. Use "Save as Template" to create one.
+                              </p>
+                            )}
+                            {quoteTemplates.map((t) => (
+                              <div key={t.id} className="flex items-center gap-2 p-2 border rounded hover:bg-muted/50">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{t.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {t.shared ? "Shared" : "Personal"} · by {t.created_by_name || "Unknown"} ·{" "}
+                                    {new Date(t.created_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <Button size="sm" className="text-xs" onClick={() => loadQuoteTemplate(t.id)}>
+                                  Load
+                                </Button>
+                                {(t.created_by === userId || !t.created_by) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs text-destructive"
+                                    onClick={() => deleteQuoteTemplate(t.id)}
+                                  >
+                                    Delete
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex justify-end pt-3 border-t mt-3">
+                            <Button variant="outline" size="sm" onClick={() => setShowTemplateDialog(false)}>
+                              Close
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <SummaryRail
+                    title="Quote summary"
+                    metrics={(() => {
+                      const m: SummaryMetric[] = [];
+                      if (formData) {
+                        const equip = formData.lineItems.reduce((s, i) => s + (i.price || 0) * (i.quantity || 0), 0);
+                        m.push({
+                          label: "Equipment total",
+                          value: `$${equip.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                          emphasis: true,
+                        });
+                        (formData.selectedTerms || []).forEach((t) => {
+                          const pay = (formData.paymentOverrides?.[t] ?? formData.calculatedPayments?.[t]) || 0;
+                          if (pay > 0) m.push({ label: `${t} mo lease`, value: `$${pay.toLocaleString()}/mo` });
+                        });
+                      }
+                      return m;
+                    })()}
+                    onGenerate={handleGeneratePDF}
+                    generating={generating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handlePreview}
+                    autosave={saving ? "saving" : lastSavedData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Installation Tab Content */}
+            <TabsContent value="installation" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">Installation Document</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Create an installation document for each hardware item
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <InstallationForm
+                      deal={deal}
+                      company={company}
+                      contacts={contacts}
+                      lineItems={lineItems}
+                      dealOwner={dealOwner}
+                      meterMethods={dealerSettings.meter_methods || []}
+                      ccaValue={dealerSettings.cca_value || ""}
+                      portalId={portalId || ""}
+                      onFormChange={handleInstallationFormChange}
+                      onLineItemSwitch={handleInstallationLineItemSwitch}
+                      savedConfig={getCurrentInstallationSavedConfig()}
+                      labeledContacts={labeledContacts || undefined}
+                      quoteLineItems={(formData?.lineItems || savedConfig?.lineItems)?.map((li) => ({
+                        id: li.id,
+                        model: li.model,
+                        description: li.description,
+                        quantity: li.quantity,
+                        productType: li.productType || "",
+                        parentLineItemId: li.parentLineItemId || "",
+                        itemNumber: li.itemNumber || "",
+                      }))}
+                      defaultMeterMethod={
+                        serviceAgreementFormData?.meterMethod ||
+                        lineItems.find((li: any) => li.meterMethod)?.meterMethod ||
+                        ""
+                      }
+                    />
+                    {installationFormData?.selectedLineItemId && (
+                      <div className="flex pt-3 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleInstallationSave}
+                          disabled={installationSaving}
+                        >
+                          {installationSaving ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4 mr-2" />
+                          )}
+                          {installationSaving ? "Saving..." : "Save"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <SummaryRail
+                    title="Installation summary"
+                    metrics={[{ label: "Hardware items", value: hardwareLineItems.length, emphasis: true }]}
+                    onGenerate={handleInstallationGeneratePDF}
+                    generating={installationGenerating}
+                    canGenerate={userPermissions.can_generate && !!installationFormData?.selectedLineItemId}
+                    generateLabel="Generate PDF"
+                    onPreview={handleInstallationPreview}
+                    autosave={installationSaving ? "saving" : installationFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Service Agreement Tab Content */}
+            <TabsContent value="service_agreement" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">Service Agreement</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Create a service agreement with maintenance terms and rates
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <ServiceAgreementForm
+                      standardTerms={documentTerms.service_agreement}
+                      formData={
+                        serviceAgreementFormData || {
+                          customerNumber: "",
+                          customerNumberOverride: "",
+                          meterMethod: "",
+                          shipToCompany: "",
+                          shipToAddress: "",
+                          shipToCity: "",
+                          shipToState: "",
+                          shipToZip: "",
+                          shipToAttn: "",
+                          shipToPhone: "",
+                          shipToEmail: "",
+                          billToCompany: "",
+                          billToAddress: "",
+                          billToCity: "",
+                          billToState: "",
+                          billToZip: "",
+                          billToAttn: "",
+                          billToPhone: "",
+                          billToEmail: "",
+                          maintenanceType: "",
+                          paperStaples: "",
+                          drumToner: "",
+                          effectiveDate: null,
+                          contractLengthMonths: "",
+                          billingPeriod: "monthly",
+                          rates: {},
+                        }
+                      }
+                      onChange={handleServiceAgreementFormChange}
+                      company={
+                        company
+                          ? {
+                              name: company.name,
+                              customerNumber: company.customerNumber,
+                              // Ship To (Delivery) Address
+                              deliveryAddress: company.deliveryAddress,
+                              deliveryAddress2: company.deliveryAddress2,
+                              deliveryCity: company.deliveryCity,
+                              deliveryState: company.deliveryState,
+                              deliveryZip: company.deliveryZip,
+                              // Bill To (AP) Address
+                              apAddress: company.apAddress,
+                              apAddress2: company.apAddress2,
+                              apCity: company.apCity,
+                              apState: company.apState,
+                              apZip: company.apZip,
+                              // Fallback address
+                              address: company.address,
+                              address2: company.address2,
+                              city: company.city,
+                              state: company.state,
+                              zip: company.zip,
+                            }
+                          : null
+                      }
+                      lineItems={
+                        formData?.lineItems?.length
+                          ? formData.lineItems.map((li) => ({
+                              id: li.id,
+                              name: li.description || li.model,
+                              model: li.model,
+                              description: li.description,
+                              quantity: li.quantity,
+                              price: li.price,
+                              cost: li.cost,
+                              sku: li.model,
+                              category: li.productType || "",
+                              itemNumber: li.itemNumber || "",
+                              parentLineItemId: li.parentLineItemId || "",
+                              serial: li.serial || "",
+                              equipmentId: li.equipmentId || "",
+                            }))
+                          : lineItems
+                      }
+                      dealerSettings={dealerSettings}
+                      savedConfig={serviceAgreementSavedConfig}
+                      labeledContacts={labeledContacts || { shippingContact: null, apContact: null, itContact: null }}
+                      quoteFormData={
+                        formData
+                          ? {
+                              includedBWCopies: String(formData.includedBWCopies),
+                              includedColorCopies: String(formData.includedColorCopies),
+                              overageBWRate: String(formData.overageBWRate),
+                              overageColorRate: String(formData.overageColorRate),
+                              serviceBaseRate: String(formData.serviceBaseRate),
+                              serviceBillingPeriod: formData.serviceBillingPeriod || "monthly",
+                            }
+                          : null
+                      }
+                      installationConfigs={installationSavedConfig}
+                    />
+                    <div className="flex pt-3 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleServiceAgreementSave}
+                        disabled={serviceAgreementSaving}
+                      >
+                        {serviceAgreementSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {serviceAgreementSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <SummaryRail
+                    title="Service agreement summary"
+                    onGenerate={handleServiceAgreementGeneratePDF}
+                    generating={serviceAgreementGenerating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handleServiceAgreementPreview}
+                    autosave={serviceAgreementSaving ? "saving" : serviceAgreementFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* FMV Lease Tab Content */}
+            <TabsContent value="fmv_lease" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">FMV Lease Agreement</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Create a fair market value lease agreement</p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <FMVLeaseForm
+                      standardTerms={documentTerms.fmv_lease}
+                      formData={
+                        fmvLeaseFormData || {
+                          companyLegalName: "",
+                          phone: "",
+                          billingAddress: "",
+                          billingCity: "",
+                          billingState: "",
+                          billingZip: "",
+                          equipmentAddress: "",
+                          equipmentCity: "",
+                          equipmentState: "",
+                          equipmentZip: "",
+                          equipmentItems: [],
+                          termInMonths: "",
+                          paymentFrequency: "monthly",
+                          firstPaymentDate: null,
+                          paymentAmount: "",
+                        }
+                      }
+                      onChange={handleFMVLeaseFormChange}
+                      company={
+                        company
+                          ? {
+                              name: company.name,
+                              phone: company.phone,
+                              deliveryAddress: company.deliveryAddress,
+                              deliveryAddress2: company.deliveryAddress2,
+                              deliveryCity: company.deliveryCity,
+                              deliveryState: company.deliveryState,
+                              deliveryZip: company.deliveryZip,
+                              apAddress: company.apAddress,
+                              apAddress2: company.apAddress2,
+                              apCity: company.apCity,
+                              apState: company.apState,
+                              apZip: company.apZip,
+                              address: company.address,
+                              address2: company.address2,
+                              city: company.city,
+                              state: company.state,
+                              zip: company.zip,
+                            }
+                          : null
+                      }
+                      lineItems={lineItems}
+                      savedConfig={fmvLeaseSavedConfig}
+                      serviceAgreementFormData={
+                        serviceAgreementFormData
+                          ? {
+                              contractLengthMonths: serviceAgreementFormData.contractLengthMonths,
+                              effectiveDate: serviceAgreementFormData.effectiveDate,
+                            }
+                          : null
+                      }
+                      quoteFormData={
+                        formData
+                          ? {
+                              serviceBaseRate: formData.serviceBaseRate,
+                            }
+                          : null
+                      }
+                    />
+                    <div className="flex pt-3 border-t">
+                      <Button variant="outline" size="sm" onClick={handleFMVLeaseSave} disabled={fmvLeaseSaving}>
+                        {fmvLeaseSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {fmvLeaseSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <SummaryRail
+                    title="FMV lease summary"
+                    metrics={[
+                      {
+                        label: "Monthly payment",
+                        value: fmvLeaseFormData?.paymentAmount ? `$${fmvLeaseFormData.paymentAmount}` : "—",
+                        emphasis: true,
+                      },
+                    ]}
+                    onGenerate={handleFMVLeaseGeneratePDF}
+                    generating={fmvLeaseGenerating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handleFMVLeasePreview}
+                    autosave={fmvLeaseSaving ? "saving" : fmvLeaseFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Lease Funding Tab Content */}
+            <TabsContent value="lease_funding" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">Lease Funding Document</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Create a lease funding document for each hardware item
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <LeaseFundingForm
+                      deal={deal}
+                      company={
+                        company
+                          ? {
+                              name: company.name,
+                              deliveryAddress: company.deliveryAddress,
+                              deliveryAddress2: company.deliveryAddress2,
+                              deliveryCity: company.deliveryCity,
+                              deliveryState: company.deliveryState,
+                              deliveryZip: company.deliveryZip,
+                              address: company.address,
+                              address2: company.address2,
+                              city: company.city,
+                              state: company.state,
+                              zip: company.zip,
+                            }
+                          : null
+                      }
+                      lineItems={lineItems}
+                      dealOwner={dealOwner}
+                      fmvLeaseFormData={
+                        fmvLeaseFormData
+                          ? {
+                              companyLegalName: fmvLeaseFormData.companyLegalName,
+                              equipmentAddress: fmvLeaseFormData.equipmentAddress,
+                              equipmentCity: fmvLeaseFormData.equipmentCity,
+                              equipmentState: fmvLeaseFormData.equipmentState,
+                              equipmentZip: fmvLeaseFormData.equipmentZip,
+                              termInMonths: fmvLeaseFormData.termInMonths,
+                              paymentAmount: fmvLeaseFormData.paymentAmount,
+                            }
+                          : null
+                      }
+                      portalId={portalId || undefined}
+                      onFormChange={handleLeaseFundingFormChange}
+                      onLineItemSwitch={handleLeaseFundingLineItemSwitch}
+                      savedConfig={getCurrentLeaseFundingSavedConfig()}
+                    />
+                    <div className="flex pt-3 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleLeaseFundingSave}
+                        disabled={leaseFundingSaving}
+                      >
+                        {leaseFundingSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {leaseFundingSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <SummaryRail
+                    title="Lease funding summary"
+                    metrics={[
+                      {
+                        label: "Monthly payment",
+                        value: leaseFundingFormData?.monthlyPayment ? `$${leaseFundingFormData.monthlyPayment}` : "—",
+                        emphasis: true,
+                      },
+                    ]}
+                    onGenerate={handleLeaseFundingGeneratePDF}
+                    generating={leaseFundingGenerating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handleLeaseFundingPreview}
+                    autosave={leaseFundingSaving ? "saving" : leaseFundingFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Letter of Intent Tab Content */}
+            <TabsContent value="loi" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">Letter of Intent</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Create a letter of intent for the deal</p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <LoiForm
+                      company={company}
+                      lineItems={lineItems || []}
+                      dealOwner={dealOwner}
+                      fmvLeaseFormData={
+                        fmvLeaseFormData
+                          ? {
+                              companyLegalName: fmvLeaseFormData.companyLegalName,
+                              billingAddress: fmvLeaseFormData.billingAddress,
+                              billingCity: fmvLeaseFormData.billingCity,
+                              billingState: fmvLeaseFormData.billingState,
+                              billingZip: fmvLeaseFormData.billingZip,
+                              phone: fmvLeaseFormData.phone,
+                              termInMonths: fmvLeaseFormData.termInMonths,
+                              paymentAmount: fmvLeaseFormData.paymentAmount,
+                            }
+                          : null
+                      }
+                      labeledContacts={labeledContacts || null}
+                      portalId={portalId || undefined}
+                      onFormChange={handleLoiFormChange}
+                      savedConfig={loiSavedConfig || undefined}
+                    />
+                    <div className="flex pt-3 border-t">
+                      <Button variant="outline" size="sm" onClick={handleLoiSave} disabled={loiSaving}>
+                        {loiSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {loiSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <SummaryRail
+                    title="Letter of intent summary"
+                    onGenerate={handleLoiGeneratePDF}
+                    generating={loiGenerating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handleLoiPreview}
+                    autosave={loiSaving ? "saving" : loiFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Lease Return Tab Content */}
+            <TabsContent value="lease_return" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">Lease Return Letter</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Create a lease return letter for equipment being returned to the leasing company
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <LeaseReturnForm
+                      deal={deal}
+                      company={company}
+                      dealOwner={dealOwner}
+                      quoteFormData={
+                        formData
+                          ? {
+                              paymentAmount: formData.paymentAmount,
+                              paymentsRemaining: formData.paymentsRemaining,
+                              earlyTerminationFee: formData.earlyTerminationFee,
+                              returnShipping: formData.returnShipping,
+                            }
+                          : null
+                      }
+                      fmvLeaseFormData={
+                        fmvLeaseFormData
+                          ? {
+                              companyLegalName: fmvLeaseFormData.companyLegalName,
+                            }
+                          : null
+                      }
+                      portalId={portalId || undefined}
+                      onFormChange={handleLeaseReturnFormChange}
+                      savedConfig={leaseReturnSavedConfig}
+                    />
+                    <div className="flex pt-3 border-t">
+                      <Button variant="outline" size="sm" onClick={handleLeaseReturnSave} disabled={leaseReturnSaving}>
+                        {leaseReturnSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {leaseReturnSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <SummaryRail
+                    title="Lease return summary"
+                    onGenerate={handleLeaseReturnGeneratePDF}
+                    generating={leaseReturnGenerating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handleLeaseReturnPreview}
+                    autosave={leaseReturnSaving ? "saving" : leaseReturnFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Interterritorial Tab Content */}
+            <TabsContent value="interterritorial" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">Interterritorial Agreement</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Coordinate service between home and servicing dealers
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <InterterritorialForm
+                      standardTerms={documentTerms.interterritorial}
+                      formData={
+                        interterritorialFormData || {
+                          requestedInstallDate: null,
+                          originatingName: "",
+                          originatingBillTo: "",
+                          originatingPhone: "",
+                          originatingAttn: "",
+                          originatingEmail: "",
+                          originatingCca: "",
+                          installingName: "",
+                          installingAddress: "",
+                          installingPhone: "",
+                          installingAttn: "",
+                          installingEmail: "",
+                          installingCca: "",
+                          installingDealerNumber: "",
+                          customerName: "",
+                          customerAddress: "",
+                          customerPhone: "",
+                          customerAttn: "",
+                          customerEmail: "",
+                          customerFax: "",
+                          equipmentItems: [],
+                          serviceBaseCharge: "",
+                          serviceIncludes: "",
+                          serviceOverageBW: "",
+                          serviceOverageColor: "",
+                          serviceFrequency: "Monthly",
+                          serviceBillTo: "Originating Dealer",
+                          removalEquipment: [],
+                        }
+                      }
+                      onChange={handleInterterritorialFormChange}
+                      dealerInfo={dealerInfo}
+                      dealerSettings={dealerSettings}
+                      dealOwner={dealOwner}
+                      lineItems={lineItems}
+                      fmvLeaseFormData={
+                        fmvLeaseFormData
+                          ? {
+                              companyLegalName: fmvLeaseFormData.companyLegalName,
+                              equipmentAddress: fmvLeaseFormData.equipmentAddress,
+                              equipmentCity: fmvLeaseFormData.equipmentCity,
+                              equipmentState: fmvLeaseFormData.equipmentState,
+                              equipmentZip: fmvLeaseFormData.equipmentZip,
+                              phone: fmvLeaseFormData.phone,
+                            }
+                          : null
+                      }
+                      serviceAgreementFormData={
+                        serviceAgreementFormData
+                          ? {
+                              rates: serviceAgreementFormData.rates,
+                              contractLengthMonths: serviceAgreementFormData.contractLengthMonths,
+                              shipToCompany: serviceAgreementFormData.shipToCompany,
+                              shipToAddress: serviceAgreementFormData.shipToAddress,
+                              shipToCity: serviceAgreementFormData.shipToCity,
+                              shipToState: serviceAgreementFormData.shipToState,
+                              shipToZip: serviceAgreementFormData.shipToZip,
+                              shipToAttn: serviceAgreementFormData.shipToAttn,
+                              shipToPhone: serviceAgreementFormData.shipToPhone,
+                              shipToEmail: serviceAgreementFormData.shipToEmail,
+                            }
+                          : null
+                      }
+                      quoteFormData={formData ? { phone: formData.phone } : null}
+                      savedConfig={interterritorialSavedConfig}
+                      canEditCost={userPermissions.is_admin}
+                    />
+                    <div className="flex pt-3 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleInterterritorialSave}
+                        disabled={interterritorialSaving}
+                      >
+                        {interterritorialSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {interterritorialSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <SummaryRail
+                    title="Interterritorial summary"
+                    onGenerate={handleInterterritorialGeneratePDF}
+                    generating={interterritorialGenerating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handleInterterritorialPreview}
+                    autosave={interterritorialSaving ? "saving" : interterritorialFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* New Customer Tab Content */}
+            <TabsContent value="new_customer" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">New Customer Application</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Create a new customer application form for credit/account setup
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <NewCustomerForm
+                      standardTerms={documentTerms.new_customer}
+                      formData={
+                        newCustomerFormData || {
+                          companyName: "",
+                          tradeName: "",
+                          businessDescription: "",
+                          taxId: "",
+                          taxIdState: "",
+                          yearEstablished: "",
+                          yearsOwned: "",
+                          creditRequested: "",
+                          businessType: "",
+                          hqAddress: "",
+                          hqAddress2: "",
+                          hqCity: "",
+                          hqState: "",
+                          hqZip: "",
+                          hqPhone: "",
+                          hqFax: "",
+                          hqEmail: "",
+                          branchSameAsHq: false,
+                          branchAddress: "",
+                          branchAddress2: "",
+                          branchCity: "",
+                          branchState: "",
+                          branchZip: "",
+                          branchPhone: "",
+                          branchFax: "",
+                          branchEmail: "",
+                          billingSameAsHq: false,
+                          billingSameAsBranch: false,
+                          billingAddress: "",
+                          billingAddress2: "",
+                          billingCity: "",
+                          billingState: "",
+                          billingZip: "",
+                          billingPhone: "",
+                          billingFax: "",
+                          billingEmail: "",
+                          principalName: "",
+                          principalTitle: "",
+                          principalPhone: "",
+                          principalEmail: "",
+                          equipmentContactName: "",
+                          equipmentContactTitle: "",
+                          equipmentContactPhone: "",
+                          equipmentContactEmail: "",
+                          apContactName: "",
+                          apContactTitle: "",
+                          apContactPhone: "",
+                          apContactEmail: "",
+                          interestOfficeMachines: false,
+                          interestFurniture: false,
+                          interestSupplies: false,
+                          interestOther: "",
+                          bankReferences: [],
+                          businessReferences: [],
+                          invoiceDelivery: "email",
+                          invoiceEmail: "",
+                          invoiceSecondaryEmail: "",
+                          paymentMethod: "",
+                        }
+                      }
+                      onChange={handleNewCustomerFormChange}
+                      company={company}
+                      dealOwner={dealOwner}
+                      labeledContacts={labeledContacts || undefined}
+                      savedConfig={newCustomerSavedConfig}
+                      onClearAll={handleNewCustomerClearAll}
+                    />
+                    <div className="flex pt-3 border-t">
+                      <Button variant="outline" size="sm" onClick={handleNewCustomerSave} disabled={newCustomerSaving}>
+                        {newCustomerSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {newCustomerSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <SummaryRail
+                    title="New customer summary"
+                    onGenerate={handleNewCustomerGeneratePDF}
+                    generating={newCustomerGenerating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handleNewCustomerPreview}
+                    autosave={newCustomerSaving ? "saving" : newCustomerFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Relocation Tab Content */}
+            <TabsContent value="relocation" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">Relocation Request</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Request equipment relocation to a new location</p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <RelocationForm formData={relocationFormData} onChange={handleRelocationFormChange} />
+                    <div className="flex pt-3 border-t">
+                      <Button variant="outline" size="sm" onClick={handleRelocationSave} disabled={relocationSaving}>
+                        {relocationSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {relocationSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <SummaryRail
+                    title="Relocation summary"
+                    onGenerate={handleRelocationGeneratePDF}
+                    generating={relocationGenerating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handleRelocationPreview}
+                    autosave={relocationSaving ? "saving" : relocationFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Removal Tab Content */}
+            <TabsContent value="equipment_removal" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">Equipment Removal Receipt</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Create an equipment removal receipt for equipment being picked up
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <RemovalForm
+                      company={company}
+                      labeledContacts={labeledContacts}
+                      dealOwner={dealOwner}
+                      lineItems={lineItems}
+                      onFormChange={handleRemovalFormChange}
+                      savedConfig={removalSavedConfig}
+                    />
+                    <div className="flex pt-3 border-t">
+                      <Button variant="outline" size="sm" onClick={handleRemovalSave} disabled={removalSaving}>
+                        {removalSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {removalSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <SummaryRail
+                    title="Equipment removal summary"
+                    onGenerate={handleRemovalGeneratePDF}
+                    generating={removalGenerating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handleRemovalPreview}
+                    autosave={removalSaving ? "saving" : removalFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Commission Tab Content */}
+            <TabsContent value="commission" className="mt-0">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight">Commission Worksheet</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Calculate sales commissions for this deal</p>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    <CommissionForm
+                      deal={deal}
+                      company={company}
+                      contacts={contacts}
+                      lineItems={lineItems}
+                      dealOwner={dealOwner}
+                      portalId={portalId}
+                      onFormChange={handleCommissionFormChange}
+                      savedConfig={commissionSavedConfig}
+                      quoteConfig={formData || savedConfig}
+                      commissionUsers={commissionUsers}
+                    />
+                    <div className="flex pt-3 border-t">
+                      <Button variant="outline" size="sm" onClick={handleCommissionSave} disabled={commissionSaving}>
+                        {commissionSaving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {commissionSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <SummaryRail
+                    title="Commission summary"
+                    metrics={[
+                      {
+                        label: "Commission rate",
+                        value: `${commissionFormData?.commissionPercentage ?? 0}%`,
+                        emphasis: true,
+                      },
+                    ]}
+                    onGenerate={handleCommissionGeneratePDF}
+                    generating={commissionGenerating}
+                    canGenerate={userPermissions.can_generate}
+                    generateLabel="Generate PDF"
+                    onPreview={handleCommissionPreview}
+                    autosave={commissionSaving ? "saving" : commissionFormData ? "saved" : "idle"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Custom Document Tabs Content */}
+            {customDocuments.map((customDoc) => (
+              <TabsContent key={customDoc.code} value={customDoc.code} className="mt-0">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2">
+                      <DynamicIcon name={customDoc.icon} className="h-5 w-5" />
+                      {customDoc.name}
+                    </CardTitle>
+                    {customDoc.description && <CardDescription>{customDoc.description}</CardDescription>}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <CustomDocumentForm
+                      document={customDoc}
+                      formData={customDocFormData[customDoc.id] || {}}
+                      onChange={(data) => handleCustomDocFormChange(customDoc.id, data)}
+                      company={company}
+                      deal={deal}
+                      dealOwner={dealOwner}
+                      lineItems={lineItems}
+                      labeledContacts={labeledContacts}
+                      companyContacts={companyContacts || undefined}
+                      properties={properties || undefined}
+                    />
+                    <div className="flex gap-2 pt-4 border-t">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleCustomDocSave(customDoc.id)}
+                        disabled={customDocSaving[customDoc.id]}
+                      >
+                        {customDocSaving[customDoc.id] ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {customDocSaving[customDoc.id] ? "Saving..." : "Save"}
+                      </Button>
+                      <Button
+                        className="flex-1"
+                        onClick={() => handleCustomDocGeneratePDF(customDoc.id)}
+                        disabled={customDocGenerating[customDoc.id]}
+                      >
+                        {customDocGenerating[customDoc.id] ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        {customDocGenerating[customDoc.id] ? "Generating..." : "Generate PDF"}
+                      </Button>
+                      <Button variant="outline" onClick={() => handleCustomDocPreview(customDoc.id)}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        Preview
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            ))}
+
+            {/* Document Packet Tab Content */}
+            <TabsContent value="document_packet" className="mt-0">
+              <DocumentPacketForm
+                portalId={portalId || ""}
+                dealId={deal?.hsObjectId || ""}
+                dealName={deal?.properties?.dealname || deal?.dealname || ""}
+                companyName={company?.properties?.name || company?.name || ""}
+              />
+            </TabsContent>
+          </div>
+        </div>
+      </Tabs>
+
+      {/* Hidden preview for Quote PDF generation */}
+      <div className="hidden">
+        {formData && (
+          <QuotePreview
+            ref={previewRef}
+            formData={formData}
+            dealerInfo={
+              formData?.overrideTerms
+                ? ({ ...(dealerInfo || {}), termsAndConditions: formData.overrideTermsText || "" } as any)
+                : dealerInfo || undefined
+            }
+            documentStyles={dealerSettings.document_styles}
+            formCustomization={dealerSettings.form_customization?.quote}
+            documentTerms={
+              formData?.overrideTerms
+                ? {
+                    ...documentTerms,
+                    quote_fmv: formData.overrideTermsText || "",
+                    quote_dollar_buyout: formData.overrideTermsText || "",
+                    quote_rental: formData.overrideTermsText || "",
+                  }
+                : documentTerms
+            }
+          />
+        )}
+      </div>
+
+      {/* Hidden preview for Installation PDF generation */}
+      <div className="hidden">
+        {installationFormData && (
+          <InstallationPreview
+            ref={installationPreviewRef}
+            formData={installationFormData}
+            dealerInfo={
+              dealerInfo
+                ? {
+                    companyName: dealerInfo.companyName,
+                    address: dealerInfo.address,
+                    phone: dealerInfo.phone,
+                    website: dealerInfo.website,
+                    logoUrl: dealerInfo.logoUrl,
+                  }
+                : undefined
+            }
+            removalReceiptTerms={documentTerms.installation_removal_receipt}
+            deliveryAcceptanceTerms={documentTerms.installation_delivery_acceptance}
+            documentStyles={dealerSettings.document_styles}
+          />
+        )}
+      </div>
+
+      {/* Quote Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle className="flex items-center gap-2">Quote Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {formData && (
+                <div className="shadow-lg border">
+                  <QuotePreview
+                    formData={formData}
+                    dealerInfo={
+                      formData?.overrideTerms
+                        ? ({ ...(dealerInfo || {}), termsAndConditions: formData.overrideTermsText || "" } as any)
+                        : dealerInfo || undefined
+                    }
+                    documentStyles={dealerSettings.document_styles}
+                    formCustomization={dealerSettings.form_customization?.quote}
+                    documentTerms={
+                      formData?.overrideTerms
+                        ? {
+                            ...documentTerms,
+                            quote_fmv: formData.overrideTermsText || "",
+                            quote_dollar_buyout: formData.overrideTermsText || "",
+                            quote_rental: formData.overrideTermsText || "",
+                          }
+                        : documentTerms
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Installation Preview Dialog */}
+      <Dialog open={showInstallationPreview} onOpenChange={setShowInstallationPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Installation Document Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {installationFormData && (
+                <div className="shadow-lg border">
+                  <InstallationPreview
+                    formData={installationFormData}
+                    dealerInfo={
+                      dealerInfo
+                        ? {
+                            companyName: dealerInfo.companyName,
+                            address: dealerInfo.address,
+                            phone: dealerInfo.phone,
+                            website: dealerInfo.website,
+                            logoUrl: dealerInfo.logoUrl,
+                          }
+                        : undefined
+                    }
+                    removalReceiptTerms={documentTerms.installation_removal_receipt}
+                    deliveryAcceptanceTerms={documentTerms.installation_delivery_acceptance}
+                    documentStyles={dealerSettings.document_styles}
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden preview for Service Agreement PDF generation */}
+      <div className="hidden">
+        {serviceAgreementFormData && (
+          <ServiceAgreementPreview
+            ref={serviceAgreementPreviewRef}
+            formData={serviceAgreementFormData}
+            dealerInfo={
+              dealerInfo
+                ? {
+                    company_name: dealerInfo.companyName,
+                    address_line1: dealerInfo.address,
+                    phone: dealerInfo.phone,
+                    website: dealerInfo.website,
+                    logo_url: dealerInfo.logoUrl,
+                  }
+                : undefined
+            }
+            lineItems={lineItems}
+            termsAndConditions={
+              serviceAgreementFormData?.overrideTerms
+                ? serviceAgreementFormData?.overrideTermsText || ""
+                : documentTerms.service_agreement
+            }
+            documentStyles={dealerSettings.document_styles}
+            installationConfigs={installationSavedConfig}
+          />
+        )}
+      </div>
+
+      {/* Service Agreement Preview Dialog */}
+      <Dialog open={showServiceAgreementPreview} onOpenChange={setShowServiceAgreementPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Service Agreement Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {serviceAgreementFormData && (
+                <div className="shadow-lg border">
+                  <ServiceAgreementPreview
+                    formData={serviceAgreementFormData}
+                    dealerInfo={
+                      dealerInfo
+                        ? {
+                            company_name: dealerInfo.companyName,
+                            address_line1: dealerInfo.address,
+                            phone: dealerInfo.phone,
+                            website: dealerInfo.website,
+                            logo_url: dealerInfo.logoUrl,
+                          }
+                        : undefined
+                    }
+                    lineItems={lineItems}
+                    termsAndConditions={
+                      serviceAgreementFormData?.overrideTerms
+                        ? serviceAgreementFormData?.overrideTermsText || ""
+                        : documentTerms.service_agreement
+                    }
+                    documentStyles={dealerSettings.document_styles}
+                    installationConfigs={installationSavedConfig}
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden preview for FMV Lease PDF generation */}
+      <div className="hidden">
+        {fmvLeaseFormData && (
+          <FMVLeasePreview
+            ref={fmvLeasePreviewRef}
+            formData={fmvLeaseFormData}
+            dealerInfo={
+              dealerInfo
+                ? {
+                    company_name: dealerInfo.companyName,
+                    address_line1: dealerInfo.address,
+                    phone: dealerInfo.phone,
+                    website: dealerInfo.website,
+                    logo_url: dealerInfo.logoUrl,
+                  }
+                : undefined
+            }
+            termsAndConditions={
+              fmvLeaseFormData?.overrideTerms ? fmvLeaseFormData?.overrideTermsText || "" : documentTerms.fmv_lease
+            }
+          />
+        )}
+      </div>
+
+      {/* FMV Lease Preview Dialog */}
+      <Dialog open={showFMVLeasePreview} onOpenChange={setShowFMVLeasePreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>FMV Lease Agreement Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {fmvLeaseFormData && (
+                <div className="shadow-lg border">
+                  <FMVLeasePreview
+                    formData={fmvLeaseFormData}
+                    dealerInfo={
+                      dealerInfo
+                        ? {
+                            company_name: dealerInfo.companyName,
+                            address_line1: dealerInfo.address,
+                            phone: dealerInfo.phone,
+                            website: dealerInfo.website,
+                            logo_url: dealerInfo.logoUrl,
+                          }
+                        : undefined
+                    }
+                    termsAndConditions={
+                      fmvLeaseFormData?.overrideTerms
+                        ? fmvLeaseFormData?.overrideTermsText || ""
+                        : documentTerms.fmv_lease
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden preview for Lease Funding PDF generation */}
+      <div className="hidden">
+        {leaseFundingFormData && (
+          <LeaseFundingPreview
+            ref={leaseFundingPreviewRef}
+            formData={leaseFundingFormData}
+            dealerInfo={
+              dealerInfo
+                ? {
+                    company_name: dealerInfo.companyName,
+                    address_line1: dealerInfo.address,
+                    phone: dealerInfo.phone,
+                    website: dealerInfo.website,
+                    logo_url: dealerInfo.logoUrl,
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+
+      {/* Lease Funding Preview Dialog */}
+      <Dialog open={showLeaseFundingPreview} onOpenChange={setShowLeaseFundingPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Lease Funding Document Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {leaseFundingFormData && (
+                <div className="shadow-lg border">
+                  <LeaseFundingPreview
+                    formData={leaseFundingFormData}
+                    dealerInfo={
+                      dealerInfo
+                        ? {
+                            company_name: dealerInfo.companyName,
+                            address_line1: dealerInfo.address,
+                            phone: dealerInfo.phone,
+                            website: dealerInfo.website,
+                            logo_url: dealerInfo.logoUrl,
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden preview for LOI PDF generation */}
+      <div className="hidden">{loiFormData && <LoiPreview ref={loiPreviewRef} formData={loiFormData} />}</div>
+
+      {/* LOI Preview Dialog */}
+      <Dialog open={showLoiPreview} onOpenChange={setShowLoiPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Letter of Intent Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {loiFormData && (
+                <div className="shadow-lg border">
+                  <LoiPreview formData={loiFormData} />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden preview for Lease Return PDF generation */}
+      <div className="hidden">
+        {leaseReturnFormData && (
+          <LeaseReturnPreview
+            ref={leaseReturnPreviewRef}
+            formData={leaseReturnFormData}
+            dealerInfo={
+              dealerInfo
+                ? {
+                    company_name: dealerInfo.companyName,
+                    address_line1: dealerInfo.address,
+                    phone: dealerInfo.phone,
+                    website: dealerInfo.website,
+                    logo_url: dealerInfo.logoUrl,
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+
+      {/* Lease Return Preview Dialog */}
+      <Dialog open={showLeaseReturnPreview} onOpenChange={setShowLeaseReturnPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Lease Return Letter Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {leaseReturnFormData && (
+                <div className="shadow-lg border">
+                  <LeaseReturnPreview
+                    formData={leaseReturnFormData}
+                    dealerInfo={
+                      dealerInfo
+                        ? {
+                            company_name: dealerInfo.companyName,
+                            address_line1: dealerInfo.address,
+                            phone: dealerInfo.phone,
+                            website: dealerInfo.website,
+                            logo_url: dealerInfo.logoUrl,
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden preview for Interterritorial PDF generation */}
+      <div className="hidden">
+        {interterritorialFormData && (
+          <InterterritorialPreview
+            ref={interterritorialPreviewRef}
+            formData={interterritorialFormData}
+            dealerInfo={
+              dealerInfo
+                ? {
+                    companyName: dealerInfo.companyName,
+                    address: dealerInfo.address,
+                    phone: dealerInfo.phone,
+                    website: dealerInfo.website,
+                    logoUrl: dealerInfo.logoUrl,
+                  }
+                : undefined
+            }
+            termsAndConditions={
+              interterritorialFormData?.overrideTerms
+                ? interterritorialFormData?.overrideTermsText || ""
+                : documentTerms.interterritorial
+            }
+          />
+        )}
+      </div>
+
+      {/* Interterritorial Preview Dialog */}
+      <Dialog open={showInterterritorialPreview} onOpenChange={setShowInterterritorialPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Interterritorial Request Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {interterritorialFormData && (
+                <div className="shadow-lg border">
+                  <InterterritorialPreview
+                    formData={interterritorialFormData}
+                    dealerInfo={
+                      dealerInfo
+                        ? {
+                            companyName: dealerInfo.companyName,
+                            address: dealerInfo.address,
+                            phone: dealerInfo.phone,
+                            website: dealerInfo.website,
+                            logoUrl: dealerInfo.logoUrl,
+                          }
+                        : undefined
+                    }
+                    termsAndConditions={
+                      interterritorialFormData?.overrideTerms
+                        ? interterritorialFormData?.overrideTermsText || ""
+                        : documentTerms.interterritorial
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden preview for New Customer PDF generation */}
+      <div className="hidden">
+        {newCustomerFormData && (
+          <NewCustomerPreview
+            ref={newCustomerPreviewRef}
+            formData={newCustomerFormData}
+            dealerInfo={
+              dealerInfo
+                ? {
+                    companyName: dealerInfo.companyName,
+                    address: dealerInfo.address,
+                    phone: dealerInfo.phone,
+                    logoUrl: dealerInfo.logoUrl,
+                  }
+                : undefined
+            }
+            termsAndConditions={
+              newCustomerFormData?.overrideTerms
+                ? newCustomerFormData?.overrideTermsText || ""
+                : documentTerms.new_customer
+            }
+          />
+        )}
+      </div>
+
+      {/* New Customer Preview Dialog */}
+      <Dialog open={showNewCustomerPreview} onOpenChange={setShowNewCustomerPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>New Customer Application Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {newCustomerFormData && (
+                <div className="shadow-lg border">
+                  <NewCustomerPreview
+                    formData={newCustomerFormData}
+                    dealerInfo={
+                      dealerInfo
+                        ? {
+                            companyName: dealerInfo.companyName,
+                            address: dealerInfo.address,
+                            phone: dealerInfo.phone,
+                            logoUrl: dealerInfo.logoUrl,
+                          }
+                        : undefined
+                    }
+                    termsAndConditions={
+                      newCustomerFormData?.overrideTerms
+                        ? newCustomerFormData?.overrideTermsText || ""
+                        : documentTerms.new_customer
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden preview for Relocation PDF generation */}
+      <div className="hidden">
+        {relocationFormData && (
+          <RelocationPreview
+            ref={relocationPreviewRef}
+            formData={relocationFormData}
+            dealerInfo={
+              dealerInfo
+                ? {
+                    name: dealerInfo.companyName,
+                    address: dealerInfo.address.split(",")[0] || "",
+                    city: "",
+                    state: "",
+                    zip: "",
+                    phone: dealerInfo.phone,
+                    website: dealerInfo.website,
+                    logoUrl: dealerInfo.logoUrl,
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+
+      {/* Relocation Preview Dialog */}
+      <Dialog open={showRelocationPreview} onOpenChange={setShowRelocationPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Relocation Request Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {relocationFormData && (
+                <div className="shadow-lg border">
+                  <RelocationPreview
+                    formData={relocationFormData}
+                    dealerInfo={
+                      dealerInfo
+                        ? {
+                            name: dealerInfo.companyName,
+                            address: dealerInfo.address.split(",")[0] || "",
+                            city: "",
+                            state: "",
+                            zip: "",
+                            phone: dealerInfo.phone,
+                            website: dealerInfo.website,
+                            logoUrl: dealerInfo.logoUrl,
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden preview for Removal PDF generation */}
+      <div className="hidden">
+        {removalFormData && (
+          <RemovalPreview
+            ref={removalPreviewRef}
+            formData={removalFormData}
+            dealerInfo={
+              dealerInfo
+                ? {
+                    company_name: dealerInfo.companyName,
+                    address_line1: dealerInfo.address,
+                    phone: dealerInfo.phone,
+                    website: dealerInfo.website,
+                    logo_url: dealerInfo.logoUrl,
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+
+      {/* Removal Preview Dialog */}
+      <Dialog open={showRemovalPreview} onOpenChange={setShowRemovalPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Equipment Removal Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {removalFormData && (
+                <div className="shadow-lg border">
+                  <RemovalPreview
+                    formData={removalFormData}
+                    dealerInfo={
+                      dealerInfo
+                        ? {
+                            company_name: dealerInfo.companyName,
+                            address_line1: dealerInfo.address,
+                            phone: dealerInfo.phone,
+                            website: dealerInfo.website,
+                            logo_url: dealerInfo.logoUrl,
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden preview for Commission PDF generation */}
+      <div className="hidden">
+        {commissionFormData && (
+          <CommissionPreview
+            ref={commissionPreviewRef}
+            formData={commissionFormData}
+            dealerInfo={
+              dealerInfo
+                ? {
+                    companyName: dealerInfo.companyName,
+                    address: dealerInfo.address,
+                    phone: dealerInfo.phone,
+                    website: dealerInfo.website,
+                    logoUrl: dealerInfo.logoUrl,
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+
+      {/* Commission Preview Dialog */}
+      <Dialog open={showCommissionPreview} onOpenChange={setShowCommissionPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Commission Worksheet Preview</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            <div className="p-4 flex justify-center">
+              {commissionFormData && (
+                <div className="shadow-lg border">
+                  <CommissionPreview
+                    formData={commissionFormData}
+                    dealerInfo={
+                      dealerInfo
+                        ? {
+                            companyName: dealerInfo.companyName,
+                            address: dealerInfo.address,
+                            phone: dealerInfo.phone,
+                            website: dealerInfo.website,
+                            logoUrl: dealerInfo.logoUrl,
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Document TabsContent, Previews and Dialogs */}
+      {customDocuments.map((customDoc) => (
+        <div key={customDoc.id}>
+          {/* Hidden preview for PDF generation */}
+          <div className="hidden">
+            <CustomDocumentPreview
+              ref={(el) => {
+                customDocPreviewRefs.current[customDoc.id] = el;
+              }}
+              document={customDoc}
+              formData={customDocFormData[customDoc.id] || {}}
+              dealerInfo={
+                dealerInfo
+                  ? {
+                      companyName: dealerInfo.companyName,
+                      address: dealerInfo.address,
+                      phone: dealerInfo.phone,
+                      website: dealerInfo.website,
+                      logoUrl: dealerInfo.logoUrl,
+                    }
+                  : undefined
+              }
+            />
+          </div>
+
+          {/* Preview Dialog */}
+          <Dialog
+            open={showCustomDocPreview[customDoc.id] || false}
+            onOpenChange={(open) => setShowCustomDocPreview((prev) => ({ ...prev, [customDoc.id]: open }))}
+          >
+            <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+              <DialogHeader className="p-4 pb-0">
+                <DialogTitle>{customDoc.name} Preview</DialogTitle>
+              </DialogHeader>
+              <ScrollArea className="max-h-[calc(90vh-80px)]">
+                <div className="p-4 flex justify-center">
+                  <div className="shadow-lg border">
+                    <CustomDocumentPreview
+                      document={customDoc}
+                      formData={customDocFormData[customDoc.id] || {}}
+                      dealerInfo={
+                        dealerInfo
+                          ? {
+                              companyName: dealerInfo.companyName,
+                              address: dealerInfo.address,
+                              phone: dealerInfo.phone,
+                              website: dealerInfo.website,
+                              logoUrl: dealerInfo.logoUrl,
+                            }
+                          : undefined
+                      }
+                    />
+                  </div>
+                </div>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+        </div>
+      ))}
+
+      {/* Feedback Floating Button */}
+      <button
+        onClick={() => {
+          setShowFeedbackPanel(true);
+          loadFeedback();
+        }}
+        className="fixed bottom-4 right-4 z-40 bg-primary text-white rounded-xl p-2.5 shadow-md hover:bg-primary/90 hover:shadow-lg transition-all duration-200"
+        title="Submit Feedback"
+      >
+        <MessageSquarePlus className="h-5 w-5" />
+      </button>
+
+      {/* Feedback Panel */}
+      {showFeedbackPanel && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
+            onClick={() => setShowFeedbackPanel(false)}
+          />
+          <div className="relative w-[400px] max-w-full bg-card border-l border-border/60 shadow-2xl flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+              <div>
+                <h2 className="text-sm font-semibold tracking-tight">Feedback & Requests</h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {feedbackList.length} item{feedbackList.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" onClick={() => setShowFeedbackForm(true)}>
+                  <MessageSquarePlus className="h-3.5 w-3.5 mr-1" />
+                  New
+                </Button>
+                <button
+                  onClick={() => setShowFeedbackPanel(false)}
+                  className="p-1.5 hover:bg-muted rounded-lg transition-colors"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+
+            {/* New Feedback Form */}
+            {showFeedbackForm && (
+              <div className="p-4 border-b border-border/60 bg-muted/30 space-y-3">
+                <div className="flex gap-1.5">
+                  <Button
+                    size="sm"
+                    variant={feedbackType === "bug" ? "default" : "outline"}
+                    onClick={() => setFeedbackType("bug")}
+                  >
+                    <Bug className="h-3 w-3 mr-1" />
+                    Bug
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={feedbackType === "feature" ? "default" : "outline"}
+                    onClick={() => setFeedbackType("feature")}
+                  >
+                    <Lightbulb className="h-3 w-3 mr-1" />
+                    Feature Request
+                  </Button>
+                </div>
+                <Input
+                  value={feedbackTitle}
+                  onChange={(e) => setFeedbackTitle(e.target.value)}
+                  placeholder="Brief title..."
+                  className="h-8"
+                />
+                <textarea
+                  value={feedbackDescription}
+                  onChange={(e) => setFeedbackDescription(e.target.value)}
+                  placeholder="Describe the issue or request in detail..."
+                  className="w-full h-20 text-sm border border-border/80 rounded-lg p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-colors placeholder:text-muted-foreground/60"
+                />
+                <div className="flex gap-1.5 justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setShowFeedbackForm(false);
+                      setFeedbackTitle("");
+                      setFeedbackDescription("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={submitFeedback} disabled={!feedbackTitle.trim()}>
+                    Submit
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Feedback List */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {feedbackList.length === 0 && (
+                <div className="text-center py-16 text-muted-foreground">
+                  <MessageSquarePlus className="h-6 w-6 mx-auto mb-3 opacity-20" />
+                  <p className="text-xs font-medium">No feedback yet</p>
+                  <p className="text-[11px] mt-0.5 opacity-70">Click "New" to submit the first one</p>
+                </div>
+              )}
+              {feedbackList.map((item) => (
+                <div
+                  key={item.id}
+                  className="border border-border/60 rounded-xl p-3 hover:bg-muted/20 transition-colors"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div className="mt-0.5 shrink-0">
+                      {item.type === "bug" ? (
+                        <div className="h-5 w-5 rounded-md bg-red-50 flex items-center justify-center">
+                          <Bug className="h-3 w-3 text-red-500" />
+                        </div>
+                      ) : (
+                        <div className="h-5 w-5 rounded-md bg-amber-50 flex items-center justify-center">
+                          <Lightbulb className="h-3 w-3 text-amber-500" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[13px] font-medium truncate">{item.title}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0 ${
+                            item.status === "new"
+                              ? "bg-blue-50 text-blue-600"
+                              : item.status === "in_progress"
+                                ? "bg-amber-50 text-amber-600"
+                                : item.status === "resolved"
+                                  ? "bg-green-50 text-green-600"
+                                  : "bg-gray-50 text-gray-500"
+                          }`}
+                        >
+                          {item.status === "new"
+                            ? "New"
+                            : item.status === "in_progress"
+                              ? "In Progress"
+                              : item.status === "resolved"
+                                ? "Resolved"
+                                : item.status}
+                        </span>
+                      </div>
+                      {item.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{item.description}</p>
+                      )}
+                      <div className="flex items-center gap-1.5 mt-2 text-[10px] text-muted-foreground/70">
+                        <span>{item.submitted_by_name || "Unknown"}</span>
+                        <span className="opacity-40">·</span>
+                        <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {item.admin_response && (
+                        <div className="mt-2 p-2.5 bg-green-50/80 border border-green-100 rounded-lg text-xs">
+                          <span className="font-medium text-green-700">Response: </span>
+                          <span className="text-green-800">{item.admin_response}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSettings && (
+        <div className="fixed inset-0 z-[60] overflow-auto bg-background">
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                Loading settings…
+              </div>
+            }
+          >
+            <AdminSettings embedded portalId={portalId || undefined} onBack={() => setShowSettings(false)} />
+          </Suspense>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function DocumentHub() {
+  return (
+    <HubSpotProvider>
+      <DocumentHubContent />
+    </HubSpotProvider>
+  );
+}

@@ -1,0 +1,462 @@
+import { useState, useEffect, useRef } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { CalendarIcon, Building2, Package, DollarSign, FileSignature } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { SectionCard, FieldGrid, Field , DealTermsOverride } from "@/components/shared";
+
+export interface FMVLeaseEquipmentItem {
+  lineItemId: string;
+  quantity: number;
+  makeModelDescription: string;
+  serialNumber: string;
+  idNumber: string;
+}
+
+export interface FMVLeaseFormData {
+  overrideTerms?: boolean;
+  overrideTermsText?: string;
+  // Customer Information
+  companyLegalName: string;
+  phone: string;
+  billingAddress: string;
+  billingCity: string;
+  billingState: string;
+  billingZip: string;
+  equipmentAddress: string;
+  equipmentCity: string;
+  equipmentState: string;
+  equipmentZip: string;
+
+  // Equipment Information (per line item)
+  equipmentItems: FMVLeaseEquipmentItem[];
+
+  // Payment Schedule
+  termInMonths: string;
+  paymentFrequency: string;
+  firstPaymentDate: Date | null;
+  paymentAmount: string;
+  termsInclude?: boolean;
+  termsTemplateId?: string;
+  termsCustomText?: string;
+}
+
+interface LineItem {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  description?: string;
+  category?: string;
+  serial?: string;
+  model?: string;
+}
+
+interface Company {
+  name?: string;
+  phone?: string;
+  deliveryAddress?: string;
+  deliveryAddress2?: string;
+  deliveryCity?: string;
+  deliveryState?: string;
+  deliveryZip?: string;
+  apAddress?: string;
+  apAddress2?: string;
+  apCity?: string;
+  apState?: string;
+  apZip?: string;
+  address?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+}
+
+interface ServiceAgreementFormData {
+  contractLengthMonths?: string;
+  effectiveDate?: Date | null;
+}
+
+interface QuoteFormData {
+  serviceBaseRate?: number;
+}
+
+interface FMVLeaseFormProps {
+  standardTerms?: string;
+  formData: FMVLeaseFormData;
+  onChange: (data: FMVLeaseFormData) => void;
+  company: Company | null;
+  lineItems: LineItem[];
+  savedConfig: FMVLeaseFormData | null;
+  serviceAgreementFormData?: ServiceAgreementFormData | null;
+  quoteFormData?: QuoteFormData | null;
+}
+
+const PAYMENT_FREQUENCIES = [
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "semi_annually", label: "Semi-Annually" },
+  { value: "annually", label: "Annually" },
+];
+
+export function FMVLeaseForm({
+  standardTerms,
+  formData,
+  onChange,
+  company,
+  lineItems,
+  savedConfig,
+  serviceAgreementFormData,
+  quoteFormData,
+}: FMVLeaseFormProps) {
+  const hasInitializedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasInitializedRef.current) return;
+    if (!company && !savedConfig) return;
+
+    const pick = (...vals: Array<string | undefined | null>) => vals.map((v) => (v ?? "").trim()).find(Boolean) || "";
+
+    const buildAddress = (line1?: string | null, line2?: string | null) => {
+      const a1 = (line1 ?? "").trim();
+      const a2 = (line2 ?? "").trim();
+      if (!a1 && !a2) return "";
+      if (a1 && a2) return `${a1}, ${a2}`;
+      return a1 || a2;
+    };
+
+    const fillIfEmpty = (current: string, next: string) => (current?.trim() ? current : next);
+
+    const base = savedConfig ? { ...formData, ...savedConfig } : { ...formData };
+
+    const equipmentAddress = company
+      ? pick(
+          buildAddress(company.deliveryAddress, company.deliveryAddress2),
+          buildAddress(company.address, company.address2),
+        )
+      : "";
+    const equipmentCity = company ? pick(company.deliveryCity, company.city) : "";
+    const equipmentState = company ? pick(company.deliveryState, company.state) : "";
+
+    const isValidZip = (val: string | undefined | null): boolean => {
+      if (!val) return false;
+      const trimmed = val.trim();
+      if (/^[A-Za-z]{2}$/.test(trimmed)) return false;
+      return trimmed.length > 0;
+    };
+
+    const rawDeliveryZip = company?.deliveryZip?.trim();
+    const rawFallbackZip = company?.zip?.trim();
+    const equipmentZip = isValidZip(rawDeliveryZip)
+      ? rawDeliveryZip!
+      : isValidZip(rawFallbackZip)
+        ? rawFallbackZip!
+        : "";
+
+    const billingAddress = company
+      ? pick(buildAddress(company.apAddress, company.apAddress2), buildAddress(company.address, company.address2))
+      : "";
+    const billingCity = company ? pick(company.apCity, company.city) : "";
+    const billingState = company ? pick(company.apState, company.state) : "";
+    const billingZip = company?.apZip?.trim() || company?.zip?.trim() || "";
+
+    const initialEquipmentItems: FMVLeaseEquipmentItem[] = lineItems.map((item) => {
+      const savedItem = base.equipmentItems?.find((e) => e.lineItemId === item.id);
+      return {
+        lineItemId: item.id,
+        quantity: item.quantity,
+        makeModelDescription: `${item.model || item.name || ""} - ${item.description || ""}`
+          .trim()
+          .replace(/^-\s*/, "")
+          .replace(/\s*-$/, ""),
+        serialNumber: savedItem?.serialNumber || item.serial || "",
+        idNumber: savedItem?.idNumber || "",
+      };
+    });
+
+    const termFromServiceAgreement = serviceAgreementFormData?.contractLengthMonths || "";
+    const effectiveDateFromServiceAgreement = serviceAgreementFormData?.effectiveDate || null;
+    const baseRateFromQuote = quoteFormData?.serviceBaseRate ? String(quoteFormData.serviceBaseRate) : "";
+
+    onChange({
+      ...base,
+      companyLegalName: fillIfEmpty(base.companyLegalName, company?.name || ""),
+      phone: fillIfEmpty(base.phone, company?.phone || ""),
+      billingAddress: fillIfEmpty(base.billingAddress, billingAddress || ""),
+      billingCity: fillIfEmpty(base.billingCity, billingCity),
+      billingState: fillIfEmpty(base.billingState, billingState),
+      billingZip: fillIfEmpty(base.billingZip, billingZip),
+      equipmentAddress: fillIfEmpty(base.equipmentAddress, equipmentAddress || ""),
+      equipmentCity: fillIfEmpty(base.equipmentCity, equipmentCity),
+      equipmentState: fillIfEmpty(base.equipmentState, equipmentState),
+      equipmentZip: fillIfEmpty(base.equipmentZip, equipmentZip),
+      equipmentItems: base.equipmentItems?.length > 0 ? base.equipmentItems : initialEquipmentItems,
+      termInMonths: fillIfEmpty(base.termInMonths, termFromServiceAgreement),
+      paymentFrequency: base.paymentFrequency || "monthly",
+      firstPaymentDate: base.firstPaymentDate || effectiveDateFromServiceAgreement,
+      paymentAmount: fillIfEmpty(base.paymentAmount, baseRateFromQuote),
+    });
+
+    hasInitializedRef.current = true;
+  }, [savedConfig, company, lineItems, serviceAgreementFormData, quoteFormData]);
+
+  const updateField = (field: keyof FMVLeaseFormData, value: any) => {
+    onChange({ ...formData, [field]: value });
+  };
+
+  const updateEquipmentItem = (index: number, field: keyof FMVLeaseEquipmentItem, value: string | number) => {
+    const newItems = [...formData.equipmentItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    onChange({ ...formData, equipmentItems: newItems });
+  };
+
+  const formatCurrency = (value: string): string => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return value;
+    return num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Customer Information */}
+      <SectionCard title="Customer Information" icon={Building2} fromHubSpot description="Lessee details from the deal">
+        <div className="space-y-4">
+          <FieldGrid columns={2}>
+            <Field label="Company Legal Name">
+              <Input
+                id="companyLegalName"
+                value={formData.companyLegalName}
+                onChange={(e) => updateField("companyLegalName", e.target.value)}
+                className="h-9 text-sm"
+              />
+            </Field>
+            <Field label="Phone">
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => updateField("phone", e.target.value)}
+                className="h-9 text-sm"
+              />
+            </Field>
+          </FieldGrid>
+
+          <div className="space-y-3">
+            <h4 className="eyebrow">Billing Address</h4>
+            <Field label="Address">
+              <Input
+                id="billingAddress"
+                value={formData.billingAddress}
+                onChange={(e) => updateField("billingAddress", e.target.value)}
+                className="h-9 text-sm"
+              />
+            </Field>
+            <FieldGrid columns={3}>
+              <Field label="City">
+                <Input
+                  id="billingCity"
+                  value={formData.billingCity}
+                  onChange={(e) => updateField("billingCity", e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </Field>
+              <Field label="State">
+                <Input
+                  id="billingState"
+                  value={formData.billingState}
+                  onChange={(e) => updateField("billingState", e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </Field>
+              <Field label="Zip">
+                <Input
+                  id="billingZip"
+                  value={formData.billingZip}
+                  onChange={(e) => updateField("billingZip", e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </Field>
+            </FieldGrid>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="eyebrow">Equipment Address (Ship To)</h4>
+            <Field label="Address">
+              <Input
+                id="equipmentAddress"
+                value={formData.equipmentAddress}
+                onChange={(e) => updateField("equipmentAddress", e.target.value)}
+                className="h-9 text-sm"
+              />
+            </Field>
+            <FieldGrid columns={3}>
+              <Field label="City">
+                <Input
+                  id="equipmentCity"
+                  value={formData.equipmentCity}
+                  onChange={(e) => updateField("equipmentCity", e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </Field>
+              <Field label="State">
+                <Input
+                  id="equipmentState"
+                  value={formData.equipmentState}
+                  onChange={(e) => updateField("equipmentState", e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </Field>
+              <Field label="Zip">
+                <Input
+                  id="equipmentZip"
+                  value={formData.equipmentZip}
+                  onChange={(e) => updateField("equipmentZip", e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </Field>
+            </FieldGrid>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Equipment Information */}
+      <SectionCard title="Equipment Information" icon={Package} description="Equipment schedule for the lease">
+        {formData.equipmentItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No line items available</p>
+        ) : (
+          <div className="space-y-3">
+            {formData.equipmentItems.map((item, index) => (
+              <div key={item.lineItemId} className="border border-border rounded-lg p-3 space-y-3">
+                <div className="grid grid-cols-12 gap-3">
+                  <div className="col-span-2 sm:col-span-1">
+                    <Label className="text-[12px] font-medium text-foreground/80">Qty</Label>
+                    <Input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => updateEquipmentItem(index, "quantity", parseInt(e.target.value) || 1)}
+                      className="h-8 text-sm text-center mt-1"
+                    />
+                  </div>
+                  <div className="col-span-10 sm:col-span-11">
+                    <Label className="text-[12px] font-medium text-foreground/80">Make/Model/Description</Label>
+                    <Input
+                      value={item.makeModelDescription}
+                      onChange={(e) => updateEquipmentItem(index, "makeModelDescription", e.target.value)}
+                      className="h-8 text-sm mt-1"
+                    />
+                  </div>
+                </div>
+                <FieldGrid columns={2}>
+                  <Field label="Serial Number">
+                    <Input
+                      value={item.serialNumber}
+                      onChange={(e) => updateEquipmentItem(index, "serialNumber", e.target.value)}
+                      className="h-8 text-sm"
+                      placeholder="Enter serial number"
+                    />
+                  </Field>
+                  <Field label="ID Number">
+                    <Input
+                      value={item.idNumber}
+                      onChange={(e) => updateEquipmentItem(index, "idNumber", e.target.value)}
+                      className="h-8 text-sm"
+                      placeholder="Enter ID number"
+                    />
+                  </Field>
+                </FieldGrid>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+
+      {/* Payment Schedule */}
+      <SectionCard title="Payment Schedule" icon={DollarSign} description="Term and payment, derived from the Quote">
+        <div className="space-y-4">
+          <FieldGrid columns={2}>
+            <Field label="Term in Months">
+              <Input
+                id="termInMonths"
+                type="number"
+                value={formData.termInMonths}
+                onChange={(e) => updateField("termInMonths", e.target.value)}
+                className="h-9 text-sm"
+                placeholder="e.g., 36"
+              />
+            </Field>
+            <Field label="Payment Frequency">
+              <Select
+                value={formData.paymentFrequency}
+                onValueChange={(value) => updateField("paymentFrequency", value)}
+              >
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Select frequency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_FREQUENCIES.map((freq) => (
+                    <SelectItem key={freq.value} value={freq.value}>
+                      {freq.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </FieldGrid>
+          <FieldGrid columns={2}>
+            <Field label="First Payment Date">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full h-9 justify-start text-left font-normal",
+                      !formData.firstPaymentDate && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.firstPaymentDate ? format(formData.firstPaymentDate, "MM/dd/yyyy") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.firstPaymentDate || undefined}
+                    onSelect={(date) => updateField("firstPaymentDate", date || null)}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </Field>
+            <Field label="Payment Amount">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  id="paymentAmount"
+                  value={formData.paymentAmount}
+                  onChange={(e) => updateField("paymentAmount", e.target.value)}
+                  className="pl-7 h-9 text-sm"
+                  placeholder="0.00"
+                />
+              </div>
+            </Field>
+          </FieldGrid>
+        </div>
+      </SectionCard>
+
+      <DealTermsOverride
+        enabled={!!formData.overrideTerms}
+        text={formData.overrideTermsText || ""}
+        standardTerms={standardTerms}
+        onToggle={(v) => updateField("overrideTerms", v)}
+        onChangeText={(v) => updateField("overrideTermsText", v)}
+      />
+    </div>
+  );
+}
