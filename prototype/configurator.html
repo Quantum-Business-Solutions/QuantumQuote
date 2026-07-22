@@ -1,0 +1,655 @@
+<title>QBS Machine Configurator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --paper:#F5F7FA; --surface:#FFFFFF; --surface-2:#EEF1F6; --surface-3:#E7EBF2;
+    --ink:#0F1622; --ink-2:#47526A; --ink-3:#8A94A6;
+    --line:#E0E5ED; --line-2:#D2D9E4;
+    --accent:#1B56D6; --accent-ink:#123fa0; --accent-soft:#E7EDFC;
+    --good:#0E9F6E; --good-soft:#E1F4EC;
+    --warn:#B4700A; --warn-soft:#FBF0DC;
+    --bad:#D64545; --bad-soft:#FBE6E6;
+    --cat-hw:#1B56D6; --cat-acc:#7A5AF8; --cat-sw:#0E9F6E; --cat-svc:#B4700A;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
+    --ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --sh-1: 0 1px 2px rgba(15,22,34,.06), 0 1px 3px rgba(15,22,34,.04);
+    --sh-2: 0 4px 12px rgba(15,22,34,.08), 0 2px 4px rgba(15,22,34,.04);
+    --sh-pop: 0 18px 50px rgba(15,22,34,.22);
+    --r: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:#0B1019; --surface:#121A27; --surface-2:#182231; --surface-3:#1F2B3D;
+      --ink:#EAEEF5; --ink-2:#A7B3C6; --ink-3:#6B778A;
+      --line:#25324A; --line-2:#2F3E5A;
+      --accent:#5B8CFF; --accent-ink:#8FB0FF; --accent-soft:#16233F;
+      --good:#34D399; --good-soft:#13291F; --warn:#E0A64B; --warn-soft:#2A2210;
+      --bad:#F26D6D; --bad-soft:#2A1717;
+      --cat-hw:#5B8CFF; --cat-acc:#A98BFF; --cat-sw:#34D399; --cat-svc:#E0A64B;
+      --sh-1: 0 1px 2px rgba(0,0,0,.4); --sh-2: 0 6px 18px rgba(0,0,0,.5);
+      --sh-pop: 0 18px 50px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper:#F5F7FA; --surface:#FFFFFF; --surface-2:#EEF1F6; --surface-3:#E7EBF2;
+    --ink:#0F1622; --ink-2:#47526A; --ink-3:#8A94A6; --line:#E0E5ED; --line-2:#D2D9E4;
+    --accent:#1B56D6; --accent-ink:#123fa0; --accent-soft:#E7EDFC;
+    --good:#0E9F6E; --good-soft:#E1F4EC; --warn:#B4700A; --warn-soft:#FBF0DC; --bad:#D64545; --bad-soft:#FBE6E6;
+    --cat-hw:#1B56D6; --cat-acc:#7A5AF8; --cat-sw:#0E9F6E; --cat-svc:#B4700A;
+    --sh-1: 0 1px 2px rgba(15,22,34,.06), 0 1px 3px rgba(15,22,34,.04);
+    --sh-2: 0 4px 12px rgba(15,22,34,.08); --sh-pop: 0 18px 50px rgba(15,22,34,.22);
+  }
+  :root[data-theme="dark"] {
+    --paper:#0B1019; --surface:#121A27; --surface-2:#182231; --surface-3:#1F2B3D;
+    --ink:#EAEEF5; --ink-2:#A7B3C6; --ink-3:#6B778A; --line:#25324A; --line-2:#2F3E5A;
+    --accent:#5B8CFF; --accent-ink:#8FB0FF; --accent-soft:#16233F;
+    --good:#34D399; --good-soft:#13291F; --warn:#E0A64B; --warn-soft:#2A2210; --bad:#F26D6D; --bad-soft:#2A1717;
+    --cat-hw:#5B8CFF; --cat-acc:#A98BFF; --cat-sw:#34D399; --cat-svc:#E0A64B;
+    --sh-1: 0 1px 2px rgba(0,0,0,.4); --sh-2: 0 6px 18px rgba(0,0,0,.5); --sh-pop: 0 18px 50px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: var(--ui); background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.45; font-size: 14px; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .num { font-variant-numeric: tabular-nums; }
+  h1,h2,h3 { text-wrap: balance; margin: 0; }
+  button { font-family: inherit; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+  .appbar { display:flex; align-items:center; gap:16px; padding:12px 20px; background: var(--surface); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:30; }
+  .brand { display:flex; align-items:center; gap:11px; }
+  .brand .mark { width:30px; height:30px; border-radius:8px; background:var(--accent); display:grid; place-items:center; color:#fff; flex:none; box-shadow: var(--sh-1); }
+  .brand .mark svg { width:17px; height:17px; }
+  .brand .tt { font-weight:700; letter-spacing:-.01em; font-size:14.5px; }
+  .brand .st { font-size:11px; color:var(--ink-3); letter-spacing:.02em; }
+  .dealchip { display:flex; align-items:center; margin-left:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; overflow:hidden; font-size:12px; }
+  .dealchip .seg { padding:6px 11px; border-right:1px solid var(--line); display:flex; gap:6px; align-items:center; }
+  .dealchip .seg:last-child { border-right:0; }
+  .dealchip .k { color:var(--ink-3); }
+  .dealchip .v { font-weight:600; }
+  .stage-pill { background:var(--accent-soft); color:var(--accent-ink); font-weight:600; padding:2px 8px; border-radius:20px; font-size:11px; }
+  .spacer { flex:1; }
+  .themebtn { border:1px solid var(--line); background:var(--surface); color:var(--ink-2); width:34px; height:34px; border-radius:8px; display:grid; place-items:center; }
+  .themebtn:hover { background:var(--surface-2); }
+  .themebtn svg { width:16px; height:16px; }
+
+  .wrap { display:grid; grid-template-columns: minmax(0,1fr) 380px; gap:22px; max-width:1380px; margin:0 auto; padding:22px 20px 60px; align-items:start; }
+  @media (max-width: 960px){ .wrap { grid-template-columns: 1fr; } .rail { position:static !important; } }
+
+  .panel { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--sh-1); margin-bottom:18px; overflow:hidden; }
+  .panel > .head { display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line); }
+  .panel > .head h2 { font-size:14px; letter-spacing:-.01em; }
+  .panel > .head .sub { font-size:12px; color:var(--ink-3); }
+  .panel > .body { padding:16px 18px; }
+  .eyebrow { font-size:11px; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-3); font-weight:700; }
+
+  .mgrid { display:grid; grid-template-columns: repeat(auto-fill, minmax(215px,1fr)); gap:12px; }
+  .mcard { text-align:left; background:var(--surface); border:1.5px solid var(--line); border-radius:10px; padding:13px 13px 12px; display:flex; flex-direction:column; gap:9px; transition: border-color .15s, box-shadow .15s, transform .15s; position:relative; }
+  .mcard:hover { border-color:var(--line-2); box-shadow:var(--sh-2); transform: translateY(-1px); }
+  .mcard .glyph { width:38px; height:38px; border-radius:8px; background:var(--surface-2); display:grid; place-items:center; color:var(--ink-2); }
+  .mcard .glyph svg { width:22px; height:22px; }
+  .mcard .nm { font-weight:650; font-size:13.5px; letter-spacing:-.01em; line-height:1.3; }
+  .mcard .chips { display:flex; gap:5px; flex-wrap:wrap; }
+  .tag { font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:5px; background:var(--surface-2); color:var(--ink-2); letter-spacing:.01em; }
+  .tag.color { background:var(--accent-soft); color:var(--accent-ink); }
+  .tag.mono { background:var(--surface-3); color:var(--ink-2); }
+  .mcard .foot { display:flex; align-items:baseline; justify-content:space-between; margin-top:auto; }
+  .mcard .price { font-family:var(--mono); font-weight:600; font-size:14px; }
+  .mcard .msrpk { font-size:10.5px; color:var(--ink-3); }
+  .mcard .addbtn { display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--accent); }
+  .mcard .incount { position:absolute; top:10px; right:10px; background:var(--good); color:#fff; font-size:11px; font-weight:700; min-width:19px; height:19px; padding:0 5px; border-radius:20px; display:none; align-items:center; justify-content:center; gap:3px; }
+  .mcard.inquote .incount { display:inline-flex; }
+  .mcard.inquote { border-color:var(--good); }
+
+  /* build tabs */
+  .buildtabs { display:flex; gap:8px; overflow-x:auto; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--surface-2); }
+  .btab { flex:none; display:flex; align-items:center; gap:9px; background:var(--surface); border:1.5px solid var(--line); border-radius:9px; padding:8px 10px 8px 12px; min-width:150px; transition:.13s; text-align:left; }
+  .btab:hover { border-color:var(--line-2); }
+  .btab.on { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .btab .bi { min-width:0; }
+  .btab .bn { font-weight:650; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
+  .btab .bsub { font-size:11px; color:var(--ink-3); font-family:var(--mono); }
+  .btab .rm { border:0; background:transparent; color:var(--ink-3); width:20px; height:20px; border-radius:5px; display:grid; place-items:center; font-size:14px; flex:none; }
+  .btab .rm:hover { background:var(--bad-soft); color:var(--bad); }
+  .addtab { flex:none; display:flex; align-items:center; gap:7px; border:1.5px dashed var(--line-2); background:transparent; color:var(--accent); border-radius:9px; padding:8px 14px; font-weight:600; font-size:12.5px; }
+  .addtab:hover { background:var(--accent-soft); border-color:var(--accent); }
+  .addtab svg { width:14px; height:14px; }
+
+  .selbar { display:flex; align-items:center; gap:14px; padding:14px 18px; }
+  .selbar .glyph { width:46px;height:46px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center; flex:none;}
+  .selbar .glyph svg{width:26px;height:26px;}
+  .selbar .nm { font-weight:700; font-size:15px; letter-spacing:-.01em;}
+  .selbar .meta { font-size:12px; color:var(--ink-3); margin-top:2px; }
+  .unitsctl { display:flex; flex-direction:column; gap:4px; align-items:center; flex:none; }
+  .unitsctl .ul { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-3); }
+
+  .optgroup { border-top:1px solid var(--line); }
+  .og-head { display:flex; align-items:center; gap:10px; padding:12px 18px 8px; }
+  .catdot { width:9px; height:9px; border-radius:3px; flex:none; }
+  .og-head .t { font-weight:650; font-size:13px; }
+  .og-head .c { font-size:11px; color:var(--ink-3); margin-left:auto; }
+  .orow { display:flex; align-items:center; gap:12px; padding:9px 18px; border-top:1px solid var(--surface-2); }
+  .orow:hover { background:var(--surface-2); }
+  .chk { width:20px; height:20px; border-radius:6px; border:1.5px solid var(--line-2); background:var(--surface); display:grid; place-items:center; flex:none; transition:.12s; color:#fff; }
+  .orow.on .chk { background:var(--accent); border-color:var(--accent); }
+  .chk svg{ width:12px;height:12px; opacity:0; }
+  .orow.on .chk svg{ opacity:1; }
+  .orow .info { min-width:0; flex:1; }
+  .orow .onm { font-size:13px; font-weight:550; line-height:1.3; }
+  .orow .osku { font-size:11px; color:var(--ink-3); margin-top:1px; }
+  .orow .flags { display:inline-flex; gap:5px; margin-left:7px; vertical-align:middle; }
+  .miniflag { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:1px 5px; border-radius:4px; }
+  .miniflag.req { background:var(--bad-soft); color:var(--bad); }
+  .miniflag.rec { background:var(--good-soft); color:var(--good); }
+  .orow .oprice { font-family:var(--mono); font-weight:600; font-size:13px; text-align:right; }
+  .qty { display:flex; align-items:center; border:1px solid var(--line-2); border-radius:7px; overflow:hidden; }
+  .qty button { width:24px; height:26px; border:0; background:var(--surface); color:var(--ink-2); font-size:15px; line-height:1; }
+  .qty button:hover { background:var(--surface-3); }
+  .qty input { width:30px; border:0; text-align:center; background:transparent; color:var(--ink); font-family:var(--mono); font-size:12px; -moz-appearance:textfield; }
+  .qty input::-webkit-outer-spin-button, .qty input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+
+  .terms { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:560px){ .terms { grid-template-columns:1fr; } }
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .field label { font-size:11.5px; font-weight:600; color:var(--ink-2); }
+  .segbtns { display:flex; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:3px; gap:3px; }
+  .segbtns button { flex:1; border:0; background:transparent; color:var(--ink-2); font-weight:600; font-size:12.5px; padding:7px 6px; border-radius:6px; }
+  .segbtns button.on { background:var(--surface); color:var(--ink); box-shadow:var(--sh-1); }
+  select, input.txt { border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:8px; padding:8px 10px; font-family:var(--ui); font-size:13px; }
+  input.txt.mono { font-family:var(--mono); }
+  .disabledblock { opacity:.4; pointer-events:none; }
+  .hint { font-size:11px; color:var(--ink-3); }
+  .cpc-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:4px; }
+
+  .rail { position:sticky; top:78px; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--sh-2); overflow:hidden; }
+  .rail .rhead { padding:14px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:9px; }
+  .rail .rhead h2 { font-size:13.5px; }
+  .rail .rhead .cnt { margin-left:auto; font-size:11px; color:var(--ink-3); }
+  .rlines { max-height:min(40vh,380px); overflow-y:auto; }
+  .rgroup { border-bottom:1px solid var(--line); }
+  .rgh { display:flex; gap:8px; align-items:baseline; padding:10px 16px 7px; background:var(--surface-2); position:sticky; top:0; }
+  .rgh .rgn { font-weight:700; font-size:12px; flex:1; min-width:0; }
+  .rgh .rgp { font-family:var(--mono); font-weight:700; font-size:12px; }
+  .rgh .rgi { font-size:10px; color:var(--ink-3); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .rline { display:flex; gap:9px; padding:7px 16px 7px 26px; align-items:flex-start; }
+  .rline .rc { width:6px;height:6px;border-radius:2px;margin-top:5px;flex:none; }
+  .rline .rn { flex:1; min-width:0; font-size:12px; line-height:1.35; }
+  .rline .rq { font-size:11px; color:var(--ink-3); }
+  .rline .rp { font-family:var(--mono); font-size:12px; font-weight:600; }
+  .rfleet .rgh { background:var(--accent-soft); }
+  .rempty { padding:40px 20px; text-align:center; color:var(--ink-3); font-size:12.5px; }
+  .rempty svg { width:30px; height:30px; opacity:.5; margin-bottom:8px; }
+
+  .totals { padding:12px 16px; border-top:1px solid var(--line); background:var(--surface-2); display:flex; flex-direction:column; gap:7px; }
+  .trow { display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; }
+  .trow .tl { color:var(--ink-2); }
+  .trow .tv { font-family:var(--mono); font-weight:600; }
+  .trow.big { font-size:15px; padding-top:8px; margin-top:2px; border-top:1px dashed var(--line-2); }
+  .trow.big .tl { color:var(--ink); font-weight:700; font-family:var(--ui); }
+  .trow.big .tv { font-size:17px; }
+  .trow .sub { font-size:10.5px; color:var(--ink-3); font-weight:500; font-family:var(--ui); }
+  .mmeter { padding:12px 16px; border-top:1px solid var(--line); }
+  .mmeter .lab { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; }
+  .mmeter .lab .l { font-size:11.5px; font-weight:600; color:var(--ink-2); }
+  .mmeter .lab .p { font-family:var(--mono); font-weight:700; font-size:15px; }
+  .track { height:8px; border-radius:5px; background:var(--surface-3); overflow:hidden; position:relative; }
+  .fill { height:100%; border-radius:5px; transition: width .35s cubic-bezier(.4,0,.2,1), background .3s; width:0%; }
+  .mmeter .tgt { position:absolute; top:-3px; width:2px; height:14px; background:var(--ink-3); border-radius:2px; }
+  .mmeter .foot { display:flex; justify-content:space-between; font-size:10.5px; color:var(--ink-3); margin-top:6px; }
+  .health { font-weight:700; }
+  .health.good{color:var(--good);} .health.warn{color:var(--warn);} .health.bad{color:var(--bad);}
+
+  .ractions { padding:14px 16px; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--line); }
+  .btn { border:0; border-radius:9px; padding:11px 14px; font-weight:650; font-size:13.5px; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .btn svg { width:16px; height:16px; }
+  .btn.primary { background:var(--accent); color:#fff; box-shadow:var(--sh-1); }
+  .btn.primary:hover { background:var(--accent-ink); }
+  .btn.primary:disabled { background:var(--surface-3); color:var(--ink-3); box-shadow:none; cursor:not-allowed; }
+  .btn.ghost { background:transparent; color:var(--ink-2); border:1px solid var(--line-2); padding:8px; font-size:12.5px; }
+  .btn.ghost:hover { background:var(--surface-2); }
+
+  .schema-note { max-width:1380px; margin:0 auto; padding:0 20px 40px; }
+  .schema-card { background:var(--surface); border:1px dashed var(--line-2); border-radius:10px; padding:14px 18px; display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+  .schema-card .lead { font-size:12px; color:var(--ink-2); max-width:640px; }
+  .flowline { display:flex; align-items:center; gap:7px; flex-wrap:wrap; font-size:11.5px; }
+  .obj { font-family:var(--mono); background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-weight:600; }
+  .obj.hl { background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); }
+  .arw { color:var(--ink-3); }
+
+  .overlay { position:fixed; inset:0; background:rgba(9,13,20,.55); backdrop-filter:blur(3px); display:none; align-items:flex-start; justify-content:center; z-index:60; padding:32px 16px; overflow-y:auto; }
+  .overlay.show { display:flex; }
+  .prop { background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--sh-pop); width:100%; max-width:680px; overflow:hidden; }
+  .prop .phead { padding:18px 22px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
+  .prop .phead .glyph { width:36px;height:36px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center; }
+  .prop .phead .glyph svg{width:20px;height:20px;}
+  .prop .phead h2 { font-size:16px; }
+  .prop .phead .psub { font-size:12px; color:var(--ink-3); }
+  .prop .pbody { padding:20px 22px; max-height:64vh; overflow-y:auto; }
+  .xbtn { margin-left:auto; border:0; background:var(--surface-2); color:var(--ink-2); width:32px;height:32px;border-radius:8px; display:grid; place-items:center; font-size:16px; }
+  .xbtn:hover{ background:var(--surface-3); }
+  .pmach { font-size:12px; font-weight:700; margin:16px 0 6px; display:flex; gap:8px; align-items:baseline; }
+  .pmach .pp { font-family:var(--mono); margin-left:auto; color:var(--ink-2); }
+  .ptable { width:100%; border-collapse:collapse; margin-bottom:2px; }
+  .ptable td { padding:5px 8px; border-bottom:1px solid var(--surface-2); font-size:12px; vertical-align:top; }
+  .ptable td .sk { font-family:var(--mono); font-size:10.5px; color:var(--ink-3); }
+  .ptable td.r { text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums; }
+  .summ { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; }
+  .summ .box { border:1px solid var(--line); border-radius:9px; padding:11px 13px; }
+  .summ .box .k { font-size:11px; color:var(--ink-3); }
+  .summ .box .v { font-family:var(--mono); font-weight:700; font-size:18px; margin-top:3px; }
+  .summ .box .kv2 { font-size:11px; color:var(--ink-3); margin-top:2px; }
+  .wb { background:var(--accent-soft); border:1px solid var(--accent); border-radius:10px; padding:12px 14px; margin-top:16px; }
+  .wb .wbh { display:flex; align-items:center; gap:8px; font-weight:700; font-size:12.5px; color:var(--accent-ink); margin-bottom:6px; }
+  .wb .wbh svg{width:15px;height:15px;}
+  .wb ul { margin:0; padding-left:18px; font-size:12px; color:var(--ink-2); }
+  .wb li { margin:2px 0; }
+  .wb code { font-family:var(--mono); font-size:11px; background:var(--surface); padding:1px 5px; border-radius:4px; border:1px solid var(--line); }
+
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:var(--paper); padding:11px 18px; border-radius:10px; font-size:13px; font-weight:600; box-shadow:var(--sh-pop); opacity:0; pointer-events:none; transition:.3s; z-index:80; display:flex; gap:9px; align-items:center; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast svg{width:16px;height:16px;color:var(--good);}
+
+  @keyframes pop { from { opacity:0; transform:translateY(6px);} to{opacity:1;transform:none;} }
+  .animate { animation: pop .25s ease both; }
+  @media (prefers-reduced-motion: reduce) { *{ animation:none !important; transition:none !important; } }
+</style>
+
+<div class="appbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="9" width="12" height="7" rx="1"/><path d="M6 9V4h12v5"/><path d="M6 16h12v4H6z"/><circle cx="15.5" cy="12.5" r=".6" fill="currentColor"/></svg></span>
+    <div><div class="tt">Machine Configurator</div><div class="st">Quantum Business Solutions · HubSpot-native CPQ</div></div>
+  </div>
+  <div class="dealchip" aria-label="Deal context">
+    <span class="seg"><span class="k">Deal</span><span class="v">Northwest Legal — Fleet Refresh</span></span>
+    <span class="seg"><span class="k">Rep</span><span class="v">S. Peterson</span></span>
+    <span class="seg"><span class="stage-pill">Proposal</span></span>
+  </div>
+  <span class="spacer"></span>
+  <button class="themebtn" id="themeToggle" title="Toggle theme" aria-label="Toggle light/dark theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></svg></button>
+</div>
+
+<div class="wrap">
+  <div class="main">
+    <!-- MACHINE PICKER -->
+    <section class="panel" id="pnlMachines">
+      <div class="head"><h2>Add machines to the quote</h2><span class="sub">Live price book · Canon line · add as many as the deal needs</span></div>
+      <div class="body"><div class="mgrid" id="mgrid"></div></div>
+    </section>
+
+    <!-- CONFIGURE -->
+    <section class="panel" id="pnlOptions" style="display:none;">
+      <div class="buildtabs" id="buildtabs"></div>
+      <div class="selbar" id="selbar"></div>
+      <div id="optgroups"></div>
+    </section>
+
+    <!-- TERMS -->
+    <section class="panel" id="pnlTerms" style="display:none;">
+      <div class="head"><h2>Commercial terms</h2><span class="sub">Applies to the whole quote</span></div>
+      <div class="body">
+        <div class="terms">
+          <div class="field">
+            <label>Acquisition</label>
+            <div class="segbtns" id="acqSeg"><button data-v="lease" class="on">Lease</button><button data-v="cash">Cash purchase</button></div>
+          </div>
+          <div class="field lease-only">
+            <label>Lease term</label>
+            <div class="segbtns" id="termSeg"><button data-v="36">36 mo</button><button data-v="48">48 mo</button><button data-v="60" class="on">60 mo</button></div>
+          </div>
+          <div class="field lease-only">
+            <label>Lease type</label>
+            <select id="leaseType"><option value="fmv">Fair Market Value (FMV)</option><option value="dollar">$1.00 buyout</option></select>
+            <span class="hint">Financed across all machines in the quote.</span>
+          </div>
+          <div class="field">
+            <label>Managed print (cost-per-click)</label>
+            <div class="segbtns" id="cpcSeg"><button data-v="on" class="on">Include CPC</button><button data-v="off">Hardware only</button></div>
+            <span class="hint">Recurring service revenue billed on meter reads.</span>
+          </div>
+        </div>
+        <div class="cpc-only" id="cpcBlock" style="margin-top:14px;">
+          <span class="hint">Set each machine's monthly page volume in its <b>Monthly print volume</b> section as you configure it — CPC revenue is calculated per machine and pooled across the fleet here.</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- RAIL -->
+  <aside>
+    <div class="rail">
+      <div class="rhead"><h2>Build sheet</h2><span class="cnt" id="lineCount">Empty</span></div>
+      <div class="rlines" id="rlines">
+        <div class="rempty" id="rempty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="7" width="16" height="10" rx="1"/><path d="M8 7V4h8v3M8 17v3h8v-3"/></svg>
+          <div>Add a machine to start<br>building the quote.</div>
+        </div>
+      </div>
+      <div class="mmeter" id="mmeter" style="display:none;">
+        <div class="lab"><span class="l">Blended gross margin</span><span class="p num" id="marginPct">—</span></div>
+        <div class="track"><div class="fill" id="marginFill"></div><span class="tgt" id="marginTgt" style="left:35%"></span></div>
+        <div class="foot"><span>Target 35%</span><span class="health" id="marginHealth"></span></div>
+      </div>
+      <div class="totals" id="totals" style="display:none;">
+        <div class="trow"><span class="tl">Hardware</span><span class="tv num" id="tHw">$0</span></div>
+        <div class="trow"><span class="tl">Accessories</span><span class="tv num" id="tAcc">$0</span></div>
+        <div class="trow"><span class="tl">Software</span><span class="tv num" id="tSw">$0</span></div>
+        <div class="trow"><span class="tl">Service &amp; install <span class="sub">(one-time)</span></span><span class="tv num" id="tSvc">$0</span></div>
+        <div class="trow big"><span class="tl">Deal amount <span class="sub" id="dealSub">equipment, ex-buyout</span></span><span class="tv num" id="tDeal">$0</span></div>
+        <div class="trow" id="payRow" style="margin-top:4px;"><span class="tl" id="payLabel">Monthly lease</span><span class="tv num" id="tPay">$0<span class="sub">/mo</span></span></div>
+        <div class="trow" id="cpcRow"><span class="tl">Monthly CPC service</span><span class="tv num" id="tCpc">$0<span class="sub">/mo</span></span></div>
+      </div>
+      <div class="ractions">
+        <button class="btn primary" id="genBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M9 13h6M9 17h4"/></svg>Generate proposal</button>
+        <button class="btn ghost" id="resetBtn">Reset quote</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="schema-note">
+  <div class="schema-card">
+    <div class="lead"><strong>How this maps into HubSpot.</strong> Each machine is a line item tagged with <span class="mono">machine_group</span>, its options tagged <span class="mono">line_role</span>=Option — HubSpot line-item associations are read-only, so grouping is a <em>property</em>, not a parent/child link. Compatibility is driven by <span class="mono">product_association</span> rules; terms live in a <span class="mono">Configuration</span> record; totals write back to the <span class="mono">Deal</span>.</div>
+    <div class="flowline"><span class="obj">Products</span><span class="arw">+</span><span class="obj hl">product_association</span><span class="arw">→</span><span class="obj">Configuration</span><span class="arw">→</span><span class="obj">Deal · Line Items (grouped by machine_group)</span></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="prop" role="dialog" aria-modal="true" aria-labelledby="propTitle">
+    <div class="phead">
+      <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/></svg></span>
+      <div><h2 id="propTitle">Proposal preview</h2><div class="psub">Northwest Legal — Fleet Refresh · prepared by S. Peterson</div></div>
+      <button class="xbtn" id="closeProp" aria-label="Close">✕</button>
+    </div>
+    <div class="pbody" id="propBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span id="toastMsg">Pushed to HubSpot Deal</span></div>
+
+<script>
+"use strict";
+const COSTR = { Hardware:0.68, Accessory:0.65, Software:0.55, Service:0.45 };
+const CATVAR = { Hardware:'--cat-hw', Accessory:'--cat-acc', Software:'--cat-sw', Service:'--cat-svc' };
+
+const MACHINES = [
+  { id:'c5140', name:'Canon imageFORCE C5140', sku:'IF-C5140', price:24090, cls:'c3', color:true, tags:['A3 Color','40 ppm','Workgroup'] },
+  { id:'c3930', name:'Canon imageRUNNER ADV DX C3930i', sku:'IRADV-C3930I', price:15570, cls:'c3', color:true, tags:['A3 Color','30 ppm'] },
+  { id:'c431',  name:'Canon imageFORCE C431F', sku:'IF-C431F', price:6640, cls:'c4', color:true, tags:['A4 Color','Desktop'] },
+  { id:'529',   name:'Canon iR-ADV DX 529iF', sku:'IRADV-529IF', price:5012, cls:'m4', color:false, tags:['A4 Mono','Desktop'] },
+  { id:'6860',  name:'Canon iR-ADV 6860i', sku:'IRADV-6860I', price:21850, cls:'m3', color:false, tags:['A3 Mono','Production','60 ppm'] },
+];
+const OPTIONS = [
+  { id:'finN1',  cat:'Accessory', name:'Inner Finisher-N1', sku:'FIN-N1', price:1784, compat:['c3','m3'], flag:'rec' },
+  { id:'bookfin',cat:'Accessory', name:'Booklet Finisher w/ Saddle Stitch', sku:'FDBK-FINA2-N', price:5191, compat:['c3','m3'] },
+  { id:'punch',  cat:'Accessory', name:'2/3 Hole Puncher Unit-A1', sku:'PUNCH-A1', price:1265, compat:['c3','m3'], needs:['finN1','bookfin'] },
+  { id:'hcf',    cat:'Accessory', name:'High Capacity Cassette Feeding Unit-F1', sku:'HCF-F1', price:2689, compat:['c3','m3'] },
+  { id:'pfc1',   cat:'Accessory', name:'Paper Feeder PF-C1', sku:'PF-C1', price:428, compat:['c3','c4','m3','m4'] },
+  { id:'cba1',   cat:'Accessory', name:'Cassette Feeding Unit-BA1', sku:'CFU-BA1', price:496, compat:['c4','m4'] },
+  { id:'cabV',   cat:'Accessory', name:'Cabinet Type-V', sku:'CAB-V', price:424, compat:['c3','c4','m3','m4'], flag:'rec' },
+  { id:'fax',    cat:'Accessory', name:'Super G3 FAX Board-AX2', sku:'FAX-AX2', price:1185, compat:['c3','c4','m3','m4'] },
+  { id:'wlan',   cat:'Accessory', name:'Wireless LAN Board-F1', sku:'WLAN-F1', price:71, compat:['c3','c4','m3','m4'] },
+  { id:'fiery',  cat:'Accessory', name:'imagePASS-R1 Fiery Print Server', sku:'IMAGEPASS-R1', price:6556, compat:['c3'], flag:'rec' },
+  { id:'unifnd', cat:'Software', name:'uniFLOW AS V7 Foundation', sku:'AS-V7-FOUND', price:930, compat:['c3','c4','m3','m4'], flag:'rec' },
+  { id:'uni10',  cat:'Software', name:'uniFLOW AS 7.2 — 10 License Pack', sku:'AS-7.2-10L', price:10500, compat:['c3','m3'] },
+  { id:'unifax', cat:'Software', name:'uniFLOW Fax V7.2', sku:'AS-FAX-V7.2', price:390, compat:['c3','c4','m3','m4'], needs:['fax'] },
+  { id:'fieryimp',cat:'Software', name:'Fiery Impose 5', sku:'FIERY-IMPO-5', price:2900, compat:['c3'], needs:['fiery'] },
+  { id:'teams',  cat:'Software', name:'Cloud Connector — MS Teams (5)', sku:'CLCO-TEAMS-5', price:600, compat:['c3','c4','m3','m4'] },
+  { id:'dbox',   cat:'Software', name:'Cloud Connector — Dropbox', sku:'CLCO-DROPBOX', price:400, compat:['c3','c4','m3','m4'] },
+  { id:'pcl',    cat:'Software', name:'PCL Font Kit-A1E', sku:'PCL-FONT-A1E', price:561, compat:['c3','c4','m3','m4'] },
+  { id:'install',cat:'Service', name:'Install & Network Setup Pak', sku:'INSTALL-PAK', price:486, compat:['c3','c4','m3','m4'], flag:'req' },
+  { id:'maint',  cat:'Service', name:'Extended Maintenance — Add\'l Year', sku:'MNTV4X-ADDYR', price:410, compat:['c3','c4','m3','m4'], flag:'rec' },
+];
+const CPC = { monoRate:0.0089, monoCost:0.0040, colorRate:0.0499, colorCost:0.0280 };
+const DEFVOL = { c3:{m:4000,c:3000}, c4:{m:1500,c:800}, m4:{m:2000,c:0}, m3:{m:25000,c:0} };
+const LEASE_FACTOR = { 36:{ fmv:0.0303, dollar:0.0325 }, 48:{ fmv:0.0242, dollar:0.0262 }, 60:{ fmv:0.0205, dollar:0.0223 } };
+const TARGET_MARGIN = 0.35;
+const CATLABEL = { Accessory:'Finishing & feeding', Software:'Software & capture', Service:'Service & support' };
+const CATORDER = ['Accessory','Software','Service'];
+
+let UID = 0;
+const state = { builds:[], active:null, acq:'lease', term:60, leaseType:'fmv', cpc:true };
+
+const $ = s => document.querySelector(s);
+const money = n => '$' + Math.round(n).toLocaleString('en-US');
+const money2 = n => '$' + n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const cvar = cat => `var(${CATVAR[cat]})`;
+const machineById = id => MACHINES.find(m=>m.id===id);
+const activeBuild = () => state.builds.find(b=>b.id===state.active) || null;
+const ICON = {
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  copier:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="9" width="14" height="7" rx="1"/><path d="M7 9V4h10v5"/><path d="M7 16h10v4H7z"/><path d="M9 5.5h4"/><circle cx="16" cy="12.5" r=".8" fill="currentColor" stroke="none"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+};
+const compatOptions = build => build ? OPTIONS.filter(o=>o.compat.includes(machineById(build.machineId).cls)) : [];
+const shortName = m => m.name.replace(/^Canon\s+(imageRUNNER ADV DX|imageFORCE|iR-ADV DX|iR-ADV)\s*/,'');
+
+/* ---- machine picker ---- */
+function renderMachines(){
+  $('#mgrid').innerHTML = MACHINES.map(m=>{
+    const count = state.builds.filter(b=>b.machineId===m.id).length;
+    return `<button class="mcard ${count?'inquote':''}" data-m="${m.id}">
+      <span class="incount">${count}×</span>
+      <span class="glyph">${ICON.copier}</span>
+      <span class="nm">${m.name}</span>
+      <span class="chips">${m.tags.map(t=>`<span class="tag ${m.color?'color':'mono'}">${t}</span>`).join('')}</span>
+      <span class="foot"><span class="price">${money(m.price)}</span><span class="addbtn">${ICON.plus} Add</span></span>
+    </button>`;
+  }).join('');
+  document.querySelectorAll('.mcard').forEach(c=>c.onclick=()=>addMachine(c.dataset.m));
+}
+
+function addMachine(id){
+  const dv = DEFVOL[machineById(id).cls] || {m:3000,c:1500};
+  const build = { id:'b'+(++UID), machineId:id, sel:{}, qty:1, volMono:dv.m, volColor:dv.c };
+  compatOptions(build).forEach(o=>{ if(o.flag==='req'||o.flag==='rec') build.sel[o.id]=1; });
+  state.builds.push(build);
+  state.active = build.id;
+  renderMachines(); renderBuildTabs(); renderActive();
+  $('#pnlOptions').style.display=''; $('#pnlTerms').style.display='';
+  $('#pnlOptions').classList.remove('animate'); void $('#pnlOptions').offsetWidth; $('#pnlOptions').classList.add('animate');
+  recompute();
+  $('#pnlOptions').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+function removeBuild(id){
+  const i = state.builds.findIndex(b=>b.id===id);
+  if(i<0) return;
+  state.builds.splice(i,1);
+  if(state.active===id) state.active = state.builds.length ? state.builds[Math.max(0,i-1)].id : null;
+  if(!state.builds.length){ $('#pnlOptions').style.display='none'; $('#pnlTerms').style.display='none'; }
+  renderMachines(); renderBuildTabs(); renderActive(); recompute();
+}
+function setActive(id){ state.active=id; renderBuildTabs(); renderActive(); }
+
+/* ---- build tabs ---- */
+function renderBuildTabs(){
+  const el = $('#buildtabs');
+  el.innerHTML = state.builds.map((b,i)=>{
+    const m = machineById(b.machineId);
+    const c = calcBuild(b);
+    return `<button class="btab ${b.id===state.active?'on':''}" data-b="${b.id}">
+      <span class="bi"><div class="bn">${shortName(m)}</div><div class="bsub">${money(c.sell)}</div></span>
+      <span class="rm" data-rm="${b.id}" title="Remove">✕</span>
+    </button>`;
+  }).join('') + `<button class="addtab" id="addMoreBtn">${ICON.plus} Add machine</button>`;
+  el.querySelectorAll('.btab').forEach(t=>t.onclick=e=>{ if(e.target.closest('[data-rm]')) return; setActive(t.dataset.b); });
+  el.querySelectorAll('[data-rm]').forEach(x=>x.onclick=e=>{ e.stopPropagation(); removeBuild(x.dataset.rm); });
+  $('#addMoreBtn').onclick=()=>$('#pnlMachines').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ---- active machine + options ---- */
+function renderActive(){
+  const b = activeBuild();
+  if(!b){ $('#selbar').innerHTML=''; $('#optgroups').innerHTML=''; return; }
+  const m = machineById(b.machineId);
+  const idx = state.builds.filter(x=>x.machineId===b.machineId).indexOf(b)+1;
+  const dupCount = state.builds.filter(x=>x.machineId===b.machineId).length;
+  $('#selbar').innerHTML = `<span class="glyph">${ICON.copier}</span>
+    <div style="flex:1;min-width:0"><div class="nm">${m.name}${dupCount>1?` <span style="color:var(--ink-3);font-weight:600">#${idx}</span>`:''}</div>
+    <div class="meta">${m.tags.join(' · ')} · base <span class="mono">${money(m.price)}</span> · <span class="mono">${m.sku}</span></div></div>
+    <div class="unitsctl"><span class="ul">Units</span><span class="qty"><button data-uq="-1" aria-label="Fewer">−</button><input type="number" min="1" value="${b.qty||1}" data-units><button data-uq="1" aria-label="More">+</button></span></div>`;
+  document.querySelectorAll('[data-uq]').forEach(bt=>bt.onclick=()=>{ const bd=activeBuild(); bd.qty=Math.max(1,(bd.qty||1)+parseInt(bt.dataset.uq,10)); renderActive(); recompute(); });
+  const uin=document.querySelector('[data-units]'); if(uin) uin.onchange=()=>{ activeBuild().qty=Math.max(1,parseInt(uin.value,10)||1); renderActive(); recompute(); };
+  renderOptions();
+}
+function renderOptions(){
+  const b = activeBuild(); if(!b){ $('#optgroups').innerHTML=''; return; }
+  const opts = compatOptions(b);
+  let html='';
+  CATORDER.forEach(cat=>{
+    const list = opts.filter(o=>o.cat===cat); if(!list.length) return;
+    html += `<div class="optgroup"><div class="og-head"><span class="catdot" style="background:${cvar(cat)}"></span><span class="t">${CATLABEL[cat]}</span><span class="c">${list.length} compatible</span></div>`;
+    list.forEach(o=>{
+      const on = b.sel[o.id]!=null; const qty = b.sel[o.id]||1;
+      const flags = (o.flag==='req'?'<span class="miniflag req">Required</span>':o.flag==='rec'?'<span class="miniflag rec">Recommended</span>':'');
+      html += `<div class="orow ${on?'on':''}" data-o="${o.id}">
+        <span class="chk" data-toggle="${o.id}">${ICON.check}</span>
+        <span class="info"><span class="onm">${o.name}<span class="flags">${flags}</span></span><span class="osku mono">${o.sku}</span></span>
+        ${on?`<span class="qty" data-qty="${o.id}"><button data-d="-1" aria-label="Decrease">−</button><input type="number" min="1" value="${qty}" data-q="${o.id}"><button data-d="1" aria-label="Increase">+</button></span>`:''}
+        <span class="oprice">${money(o.price)}</span></div>`;
+    });
+    html+='</div>';
+  });
+  if(state.cpc){
+    html += `<div class="optgroup"><div class="og-head"><span class="catdot" style="background:var(--cat-svc)"></span><span class="t">Monthly print volume · this machine</span><span class="c">drives CPC</span></div>
+      <div class="orow" style="cursor:default"><span class="info"><span class="onm">Mono pages / mo</span><span class="osku">bills $0.0089/pg · cost $0.0040</span></span><input class="txt mono" type="number" min="0" step="500" value="${b.volMono}" data-vol="mono" style="width:96px"></div>
+      <div class="orow" style="cursor:default"><span class="info"><span class="onm">Color pages / mo</span><span class="osku">bills $0.0499/pg · cost $0.0280</span></span><input class="txt mono" type="number" min="0" step="500" value="${b.volColor}" data-vol="color" style="width:96px"></div></div>`;
+  }
+  $('#optgroups').innerHTML = html;
+  document.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>toggleOpt(el.dataset.toggle));
+  document.querySelectorAll('.orow .info').forEach(el=>el.onclick=()=>toggleOpt(el.parentElement.dataset.o));
+  document.querySelectorAll('[data-qty] button').forEach(bt=>bt.onclick=e=>{ e.stopPropagation();
+    const id=bt.parentElement.dataset.qty; const d=parseInt(bt.dataset.d,10); const bd=activeBuild();
+    bd.sel[id]=Math.max(1,(bd.sel[id]||1)+d); renderOptions(); recompute(); });
+  document.querySelectorAll('[data-q]').forEach(inp=>{ inp.onclick=e=>e.stopPropagation();
+    inp.onchange=()=>{ activeBuild().sel[inp.dataset.q]=Math.max(1,parseInt(inp.value,10)||1); renderOptions(); recompute(); }; });
+  document.querySelectorAll('[data-vol]').forEach(inp=>{ inp.onclick=e=>e.stopPropagation();
+    inp.onchange=()=>{ const bd=activeBuild(); const v=Math.max(0,parseInt(inp.value,10)||0); if(inp.dataset.vol==='mono')bd.volMono=v; else bd.volColor=v; recompute(); }; });
+}
+function toggleOpt(id){
+  const b = activeBuild(); const o = OPTIONS.find(x=>x.id===id);
+  if(o.flag==='req'){ toast('Install is required on every machine','warn'); return; }
+  if(b.sel[id]!=null){
+    delete b.sel[id];
+    OPTIONS.forEach(x=>{ if(x.needs && x.needs.every(n=>b.sel[n]==null) && b.sel[x.id]!=null){ delete b.sel[x.id]; } });
+  } else {
+    if(o.needs && !o.needs.some(n=>b.sel[n]!=null)){ const need=OPTIONS.find(x=>x.id===o.needs[0]); toast(`Requires ${need.name} — added it too`,'ok'); b.sel[o.needs[0]]=1; }
+    b.sel[id]=1;
+  }
+  renderOptions(); recompute();
+}
+
+/* ---- calc ---- */
+function calcBuild(b){
+  const m = machineById(b.machineId);
+  const U = b.qty||1;
+  const lines=[{cat:'Hardware', name:m.name, sku:m.sku, qty:U, price:m.price}];
+  compatOptions(b).forEach(o=>{ if(b.sel[o.id]!=null) lines.push({cat:o.cat, name:o.name, sku:o.sku, qty:(b.sel[o.id])*U, price:o.price}); });
+  let sell=0,cost=0,hw=0,acc=0,sw=0,svc=0;
+  lines.forEach(l=>{ const ext=l.price*l.qty; sell+=ext; cost+=ext*COSTR[l.cat];
+    if(l.cat==='Hardware')hw+=ext; else if(l.cat==='Accessory')acc+=ext; else if(l.cat==='Software')sw+=ext; else svc+=ext; });
+  const cpcRev = state.cpc ? ((b.volMono*CPC.monoRate + b.volColor*CPC.colorRate)*U) : 0;
+  const cpcCost = state.cpc ? ((b.volMono*CPC.monoCost + b.volColor*CPC.colorCost)*U) : 0;
+  return {machine:m, units:U, lines, sell, cost, hw, acc, sw, svc, cpcRev, cpcCost, volMono:b.volMono*U, volColor:b.volColor*U};
+}
+function calcAll(){
+  const perBuild = state.builds.map(calcBuild);
+  let hw=0,acc=0,sw=0,svc=0,sell=0,cost=0;
+  perBuild.forEach(c=>{ hw+=c.hw; acc+=c.acc; sw+=c.sw; svc+=c.svc; sell+=c.sell; cost+=c.cost; });
+  const equip = hw+acc+sw;
+  let pay=0; if(state.acq==='lease' && equip>0) pay = equip*LEASE_FACTOR[state.term][state.leaseType];
+  let cpcRev=0,cpcCost=0,volM=0,volC=0;
+  if(state.cpc){ perBuild.forEach(c=>{ cpcRev+=c.cpcRev; cpcCost+=c.cpcCost; volM+=c.volMono; volC+=c.volColor; }); }
+  const equipGP = sell>0 ? (sell-cost)/sell : 0;
+  return {perBuild,hw,acc,sw,svc,equip,dealAmount:equip,sell,cost,equipGP,pay,cpcRev,cpcCost,volM,volC};
+}
+
+function recompute(){
+  const c = calcAll();
+  const rl = $('#rlines');
+  if(!state.builds.length){ rl.innerHTML=`<div class="rempty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="7" width="16" height="10" rx="1"/><path d="M8 7V4h8v3M8 17v3h8v-3"/></svg><div>Add a machine to start<br>building the quote.</div></div>`;
+    $('#totals').style.display='none'; $('#mmeter').style.display='none'; $('#genBtn').disabled=true; $('#lineCount').textContent='Empty'; return; }
+
+  let totalLines=0;
+  rl.innerHTML = c.perBuild.map((cb,i)=>{
+    totalLines += cb.lines.length;
+    const rows = cb.lines.slice(1).map(l=>`<div class="rline"><span class="rc" style="background:${cvar(l.cat)}"></span><span class="rn">${l.name}<div class="rq mono">${l.sku}${l.qty>1?' · ×'+l.qty:''}</div></span><span class="rp num">${money(l.price*l.qty)}</span></div>`).join('');
+    const dup = state.builds.filter(x=>x.machineId===cb.machine.id);
+    const idx = dup.indexOf(state.builds[i])+1;
+    return `<div class="rgroup"><div class="rgh"><span class="rgn">${shortName(cb.machine)}${dup.length>1?` #${idx}`:''} <span class="rgi">${cb.units>1?'×'+cb.units+' units':'machine '+(i+1)}</span></span><span class="rgp num">${money(cb.sell)}</span></div>
+      <div class="rline"><span class="rc" style="background:${cvar('Hardware')}"></span><span class="rn">${cb.machine.name}<div class="rq mono">${cb.machine.sku} · base unit${cb.units>1?' · ×'+cb.units:''}</div></span><span class="rp num">${money(cb.machine.price*cb.units)}</span></div>${rows}</div>`;
+  }).join('');
+
+  $('#lineCount').textContent = `${state.builds.length} machine${state.builds.length>1?'s':''} · ${totalLines} lines`;
+  $('#totals').style.display=''; $('#mmeter').style.display=''; $('#genBtn').disabled=false;
+  $('#tHw').textContent=money(c.hw); $('#tAcc').textContent=money(c.acc); $('#tSw').textContent=money(c.sw); $('#tSvc').textContent=money(c.svc);
+  $('#tDeal').textContent=money(c.dealAmount);
+
+  const payRow=$('#payRow'), cpcRow=$('#cpcRow');
+  if(state.acq==='lease'){ payRow.style.display=''; $('#payLabel').textContent=`Monthly lease · ${state.term}mo ${state.leaseType==='fmv'?'FMV':'$1'}`; $('#tPay').innerHTML=money2(c.pay)+'<span class="sub">/mo</span>'; }
+  else payRow.style.display='none';
+  if(state.cpc){ cpcRow.style.display=''; $('#tCpc').innerHTML=money2(c.cpcRev)+'<span class="sub">/mo</span>'; } else cpcRow.style.display='none';
+
+  const pct = c.equipGP*100; $('#marginPct').textContent=pct.toFixed(1)+'%';
+  const fill=$('#marginFill'); fill.style.width=Math.max(3,Math.min(100,pct))+'%';
+  const health=$('#marginHealth'); let col,label;
+  if(c.equipGP>=TARGET_MARGIN){ col='var(--good)'; label='On target'; health.className='health good'; }
+  else if(c.equipGP>=TARGET_MARGIN-0.07){ col='var(--warn)'; label='Below target'; health.className='health warn'; }
+  else { col='var(--bad)'; label='Thin'; health.className='health bad'; }
+  fill.style.background=col; health.textContent=label;
+
+  renderBuildTabs();
+}
+
+/* ---- terms ---- */
+function bindSeg(sel, fn){ document.querySelectorAll(`${sel} button`).forEach(b=>b.onclick=()=>{ document.querySelectorAll(`${sel} button`).forEach(x=>x.classList.remove('on')); b.classList.add('on'); fn(b.dataset.v); }); }
+bindSeg('#acqSeg', v=>{ state.acq=v; document.querySelectorAll('.lease-only').forEach(e=>e.classList.toggle('disabledblock', v!=='lease')); recompute(); });
+bindSeg('#termSeg', v=>{ state.term=parseInt(v,10); recompute(); });
+bindSeg('#cpcSeg', v=>{ state.cpc=(v==='on'); $('#cpcBlock').classList.toggle('disabledblock', !state.cpc); renderOptions(); recompute(); });
+$('#leaseType').onchange=e=>{ state.leaseType=e.target.value; recompute(); };
+
+/* ---- proposal ---- */
+function openProposal(){
+  const c = calcAll();
+  const order=['Hardware','Accessory','Software','Service'];
+  let machineBlocks='';
+  c.perBuild.forEach((cb,i)=>{
+    const dup=state.builds.filter(x=>x.machineId===cb.machine.id); const idx=dup.indexOf(state.builds[i])+1;
+    let rows='';
+    order.forEach(cat=>{ cb.lines.filter(l=>l.cat===cat).forEach(l=>{ rows+=`<tr><td>${l.name}<div class="sk">${l.sku}${l.qty>1?' · qty '+l.qty:''}</div></td><td class="r">${money(l.price*l.qty)}</td></tr>`; }); });
+    machineBlocks += `<div class="pmach">${cb.machine.name}${cb.units>1?` ×${cb.units}`:''}${dup.length>1?` #${idx}`:''}<span class="pp">${money(cb.sell)}</span></div><table class="ptable"><tbody>${rows}</tbody></table>`;
+  });
+  const acqLine = state.acq==='lease' ? `${state.term}-month ${state.leaseType==='fmv'?'FMV':'$1.00 buyout'} lease` : 'Cash purchase';
+  const summ = `<div class="summ">
+    <div class="box"><div class="k">Deal amount (equipment)</div><div class="v">${money(c.dealAmount)}</div><div class="kv2">${state.builds.reduce((s,b)=>s+(b.qty||1),0)} machines · ex install/buyout</div></div>
+    ${state.acq==='lease'?`<div class="box"><div class="k">Monthly payment</div><div class="v">${money2(c.pay)}</div><div class="kv2">${acqLine}</div></div>`:`<div class="box"><div class="k">One-time total</div><div class="v">${money(c.sell)}</div><div class="kv2">cash purchase</div></div>`}
+    ${state.cpc?`<div class="box"><div class="k">Monthly CPC service</div><div class="v">${money2(c.cpcRev)}</div><div class="kv2">GP ${money2(c.cpcRev-c.cpcCost)}/mo</div></div>`:''}
+    <div class="box"><div class="k">Blended equipment margin</div><div class="v">${(c.equipGP*100).toFixed(1)}%</div><div class="kv2">GP ${money(c.sell-c.cost)}</div></div></div>`;
+  const totalLines = c.perBuild.reduce((s,cb)=>s+cb.lines.length,0);
+  const wb = `<div class="wb"><div class="wbh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M12 2v14M6 8l6-6 6 6"/></svg>Writes back to the HubSpot Deal</div><ul>
+    <li><code>deal.amount</code> = ${money(c.dealAmount)} · <code>dealstage</code> → Proposal</li>
+    <li><strong>${state.builds.length}</strong> machine line items + ${totalLines-state.builds.length} option line items — grouped via <code>machine_group</code> + <code>line_role</code> (line-item associations are read-only in HubSpot)</li>
+    <li><code>margin_percent</code> ${(c.equipGP*100).toFixed(1)}% · <code>margin_dollars</code> ${money(c.sell-c.cost)}</li>
+    ${state.acq==='lease'?`<li><code>lease_type</code> ${state.leaseType==='fmv'?'FMV':'$1 buyout'} · <code>lease_term</code> ${state.term} · <code>lease_payment</code> ${money2(c.pay)} (financed across fleet)</li>`:''}
+    ${state.cpc?`<li><code>cpc_rate</code> color ${money2(CPC.colorRate)} / mono ${money2(CPC.monoRate)} · ${(c.volM+c.volC).toLocaleString('en-US')} pages/mo pooled across ${state.builds.length} machines</li>`:''}</ul></div>`;
+  $('#propBody').innerHTML = machineBlocks + summ + wb + `<div style="display:flex;gap:8px;margin-top:18px"><button class="btn primary" id="pushBtn" style="flex:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Push to HubSpot Deal</button><button class="btn ghost" id="cancelProp" style="flex:none;padding:11px 16px">Close</button></div>`;
+  $('#overlay').classList.add('show');
+  $('#pushBtn').onclick=()=>{ $('#overlay').classList.remove('show'); toast(`${state.builds.length}-machine quote synced to HubSpot Deal`,'ok'); };
+  $('#cancelProp').onclick=closeProposal;
+}
+function closeProposal(){ $('#overlay').classList.remove('show'); }
+$('#genBtn').onclick=openProposal;
+$('#closeProp').onclick=closeProposal;
+$('#overlay').onclick=e=>{ if(e.target===$('#overlay')) closeProposal(); };
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeProposal(); });
+
+$('#resetBtn').onclick=()=>{ state.builds=[]; state.active=null; state.acq='lease'; state.term=60; state.leaseType='fmv'; state.cpc=true;
+  $('#pnlOptions').style.display='none'; $('#pnlTerms').style.display='none'; renderMachines(); recompute(); $('#pnlMachines').scrollIntoView({behavior:'smooth',block:'start'}); };
+
+let toastT;
+function toast(msg,kind){ const t=$('#toast'); $('#toastMsg').textContent=msg; t.querySelector('svg').style.color = kind==='warn'?'var(--warn)':'var(--good)'; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2600); }
+
+$('#themeToggle').onclick=()=>{ const cur=document.documentElement.getAttribute('data-theme'); const next=cur==='dark'?'light':cur==='light'?'dark':(matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark'); document.documentElement.setAttribute('data-theme',next); };
+
+renderMachines(); recompute();
+</script>

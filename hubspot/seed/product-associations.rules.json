@@ -1,0 +1,32 @@
+{
+  "_comment": "Compatibility rules seeded into the product_association custom object. SKU-based (portal-independent); the provisioning script resolves base_sku/related_sku to product IDs at load time. rule_type: requires | excludes | one_of | default_included | optional. group_id ties a one-of / requires set together.",
+  "rules": [
+    { "base_sku": "IF-C5140", "related_sku": "INSTALL-PAK",  "rule_type": "default_included", "group_id": "",              "min_qty": 1, "max_qty": 1, "label": "C5140 requires Install (default)" },
+    { "base_sku": "IF-C5140", "related_sku": "CAB-V",        "rule_type": "default_included", "group_id": "",              "min_qty": 1, "max_qty": 1, "label": "C5140 includes Cabinet (default)" },
+    { "base_sku": "IF-C5140", "related_sku": "AS-V7-FOUND",  "rule_type": "default_included", "group_id": "",              "min_qty": 1, "max_qty": 1, "label": "C5140 includes uniFLOW (default)" },
+    { "base_sku": "IF-C5140", "related_sku": "FIN-N1",       "rule_type": "one_of",           "group_id": "c5140-finisher", "min_qty": 0, "max_qty": 1, "label": "C5140 finisher choice: Inner" },
+    { "base_sku": "IF-C5140", "related_sku": "FDBK-FINA2-N", "rule_type": "one_of",           "group_id": "c5140-finisher", "min_qty": 0, "max_qty": 1, "label": "C5140 finisher choice: Booklet" },
+    { "base_sku": "IF-C5140", "related_sku": "PUNCH-A1",     "rule_type": "requires",         "group_id": "c5140-finisher", "min_qty": 0, "max_qty": 1, "label": "C5140 Hole Punch requires a finisher" },
+    { "base_sku": "IF-C5140", "related_sku": "HCF-F1",       "rule_type": "optional",         "group_id": "",              "min_qty": 0, "max_qty": 1, "label": "C5140 High-Cap Feeder (optional)" },
+    { "base_sku": "IF-C5140", "related_sku": "IMAGEPASS-R1", "rule_type": "optional",         "group_id": "",              "min_qty": 0, "max_qty": 1, "label": "C5140 Fiery server (optional)" },
+    { "base_sku": "IF-C5140", "related_sku": "FAX-AX2",      "rule_type": "optional",         "group_id": "",              "min_qty": 0, "max_qty": 1, "label": "C5140 Fax board (optional)" },
+    { "base_sku": "IF-C5140", "related_sku": "WLAN-F1",      "rule_type": "optional",         "group_id": "",              "min_qty": 0, "max_qty": 1, "label": "C5140 Wireless (optional)" },
+    { "base_sku": "IF-C5140", "related_sku": "CLCO-TEAMS-5", "rule_type": "optional",         "group_id": "",              "min_qty": 0, "max_qty": 5, "label": "C5140 Teams connector (optional)" },
+    { "base_sku": "IF-C5140", "related_sku": "MNTV4X-ADDYR", "rule_type": "optional",         "group_id": "",              "min_qty": 0, "max_qty": 5, "label": "C5140 Extended maintenance (optional)" },
+
+    { "base_sku": "IRADV-6860I", "related_sku": "INSTALL-PAK",  "rule_type": "default_included", "group_id": "",             "min_qty": 1, "max_qty": 1, "label": "6860i requires Install (default)" },
+    { "base_sku": "IRADV-6860I", "related_sku": "AS-V7-FOUND",  "rule_type": "default_included", "group_id": "",             "min_qty": 1, "max_qty": 1, "label": "6860i includes uniFLOW (default)" },
+    { "base_sku": "IRADV-6860I", "related_sku": "FIN-N1",       "rule_type": "one_of",           "group_id": "6860-finisher","min_qty": 0, "max_qty": 1, "label": "6860i finisher choice: Inner" },
+    { "base_sku": "IRADV-6860I", "related_sku": "FDBK-FINA2-N", "rule_type": "one_of",           "group_id": "6860-finisher","min_qty": 0, "max_qty": 1, "label": "6860i finisher choice: Booklet" },
+    { "base_sku": "IRADV-6860I", "related_sku": "HCF-F1",       "rule_type": "optional",         "group_id": "",             "min_qty": 0, "max_qty": 2, "label": "6860i High-Cap Feeder (optional)" },
+    { "base_sku": "IRADV-6860I", "related_sku": "FAX-AX2",      "rule_type": "optional",         "group_id": "",             "min_qty": 0, "max_qty": 1, "label": "6860i Fax board (optional)" },
+    { "base_sku": "IRADV-6860I", "related_sku": "MNTV4X-ADDYR", "rule_type": "optional",         "group_id": "",             "min_qty": 0, "max_qty": 5, "label": "6860i Extended maintenance (optional)" },
+    { "base_sku": "IRADV-6860I", "related_sku": "IMAGEPASS-R1", "rule_type": "excludes",         "group_id": "",             "min_qty": 0, "max_qty": 0, "label": "6860i excludes Fiery (mono device)" },
+
+    { "base_sku": "IRADV-529IF", "related_sku": "INSTALL-PAK", "rule_type": "default_included", "group_id": "", "min_qty": 1, "max_qty": 1, "label": "529iF requires Install (default)" },
+    { "base_sku": "IRADV-529IF", "related_sku": "CAB-V",       "rule_type": "optional",         "group_id": "", "min_qty": 0, "max_qty": 1, "label": "529iF Cabinet (optional)" },
+    { "base_sku": "IRADV-529IF", "related_sku": "PF-C1",       "rule_type": "optional",         "group_id": "", "min_qty": 0, "max_qty": 3, "label": "529iF Paper feeder (optional)" },
+    { "base_sku": "IRADV-529IF", "related_sku": "FAX-AX2",     "rule_type": "optional",         "group_id": "", "min_qty": 0, "max_qty": 1, "label": "529iF Fax board (optional)" },
+    { "base_sku": "IRADV-529IF", "related_sku": "WLAN-F1",     "rule_type": "optional",         "group_id": "", "min_qty": 0, "max_qty": 1, "label": "529iF Wireless (optional)" }
+  ]
+}

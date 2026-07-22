@@ -1,0 +1,23 @@
+{
+  "name": "product_association",
+  "labels": {"singular":"Product Association","plural":"Product Associations"},
+  "primaryDisplayProperty": "association_label",
+  "requiredProperties": ["association_label"],
+  "searchableProperties": ["base_sku","related_sku"],
+  "properties": [
+    {"name":"association_label","label":"Association","type":"string","fieldType":"text"},
+    {"name":"base_sku","label":"Base SKU","type":"string","fieldType":"text"},
+    {"name":"base_product_id","label":"Base Product ID","type":"string","fieldType":"text"},
+    {"name":"related_sku","label":"Related SKU","type":"string","fieldType":"text"},
+    {"name":"related_product_id","label":"Related Product ID","type":"string","fieldType":"text"},
+    {"name":"rule_type","label":"Rule Type","type":"enumeration","fieldType":"select","options":[
+      {"label":"Requires","value":"requires","displayOrder":0},
+      {"label":"Excludes","value":"excludes","displayOrder":1},
+      {"label":"One of","value":"one_of","displayOrder":2},
+      {"label":"Default included","value":"default_included","displayOrder":3},
+      {"label":"Optional","value":"optional","displayOrder":4}]},
+    {"name":"group_id","label":"Group","type":"string","fieldType":"text"},
+    {"name":"min_qty","label":"Min Qty","type":"number","fieldType":"number"},
+    {"name":"max_qty","label":"Max Qty","type":"number","fieldType":"number"}
+  ]
+}

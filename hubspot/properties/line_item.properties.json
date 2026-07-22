@@ -1,0 +1,15 @@
+{
+  "_comment": "Custom HubSpot Line Item properties. Because line-item<->line-item associations are READ-ONLY / disallowed in HubSpot, the machine->options tree is expressed with these grouping properties instead. POST each to /crm/v3/properties/line_items. groupName 'lineiteminformation'.",
+  "objectType": "line_items",
+  "groupName": "lineiteminformation",
+  "properties": [
+    { "name": "line_role", "label": "Line Role", "type": "enumeration", "fieldType": "select",
+      "options": [
+        { "label": "Machine", "value": "Machine", "displayOrder": 0 },
+        { "label": "Option", "value": "Option", "displayOrder": 1 },
+        { "label": "Fleet", "value": "Fleet", "displayOrder": 2 }
+      ] },
+    { "name": "machine_group", "label": "Machine Group", "type": "string", "fieldType": "text",
+      "_note": "Groups a machine line item with its option line items within a deal, e.g. 'IF-C5140 #1'. Fleet-wide items use line_role=Fleet and no machine_group." }
+  ]
+}

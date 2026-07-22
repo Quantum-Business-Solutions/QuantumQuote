@@ -1,0 +1,274 @@
+<title>QBS Configurator — Data Model & Flow</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --paper:#F4F6F9; --surface:#FFFFFF; --surface-2:#EDF0F5; --surface-3:#E3E8F0;
+    --ink:#111823; --ink-2:#4B5768; --ink-3:#8A94A6;
+    --line:#E4E8EF; --line-2:#D3DAE4;
+    --accent:#2358D8;
+    --hub:#2563EB; --hub-s:#E8EFFD; --hub-d:#1746A8;
+    --obj:#7C5CFC; --obj-s:#EEE9FE; --obj-d:#5A3FD0;
+    --app:#12A46A; --app-s:#E1F5EC; --app-d:#0B7A4F;
+    --good:#12A46A; --warn:#B4700A; --bad:#D64545; --muted:#9AA4B4;
+    --mono:ui-monospace,"SF Mono","SFMono-Regular","Cascadia Code",Menlo,Consolas,monospace;
+    --ui:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --sh1:0 1px 2px rgba(17,24,35,.05),0 1px 3px rgba(17,24,35,.05);
+    --sh2:0 8px 26px rgba(17,24,35,.09),0 2px 6px rgba(17,24,35,.05);
+    --r:14px;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#0A0F17; --surface:#111926; --surface-2:#18222F; --surface-3:#1F2B3B;
+    --ink:#ECF0F6; --ink-2:#A3AEBF; --ink-3:#69748A; --line:#232F42; --line-2:#2E3C52;
+    --accent:#5B8CFF;
+    --hub:#5B8CFF; --hub-s:#152238; --hub-d:#9DBBFF; --obj:#A98BFF; --obj-s:#221B3A; --obj-d:#C3AEFF;
+    --app:#31C88E; --app-s:#0F2A1E; --app-d:#5BE0AE;
+    --good:#31C88E; --warn:#E0A64B; --bad:#F26D6D; --muted:#69748A;
+    --sh1:0 1px 2px rgba(0,0,0,.4); --sh2:0 10px 30px rgba(0,0,0,.55);
+  }}
+  :root[data-theme="light"]{--paper:#F4F6F9;--surface:#FFFFFF;--surface-2:#EDF0F5;--surface-3:#E3E8F0;--ink:#111823;--ink-2:#4B5768;--ink-3:#8A94A6;--line:#E4E8EF;--line-2:#D3DAE4;--accent:#2358D8;--hub:#2563EB;--hub-s:#E8EFFD;--hub-d:#1746A8;--obj:#7C5CFC;--obj-s:#EEE9FE;--obj-d:#5A3FD0;--app:#12A46A;--app-s:#E1F5EC;--app-d:#0B7A4F;--good:#12A46A;--warn:#B4700A;--bad:#D64545;--muted:#9AA4B4;--sh1:0 1px 2px rgba(17,24,35,.05);--sh2:0 8px 26px rgba(17,24,35,.09);}
+  :root[data-theme="dark"]{--paper:#0A0F17;--surface:#111926;--surface-2:#18222F;--surface-3:#1F2B3B;--ink:#ECF0F6;--ink-2:#A3AEBF;--ink-3:#69748A;--line:#232F42;--line-2:#2E3C52;--accent:#5B8CFF;--hub:#5B8CFF;--hub-s:#152238;--hub-d:#9DBBFF;--obj:#A98BFF;--obj-s:#221B3A;--obj-d:#C3AEFF;--app:#31C88E;--app-s:#0F2A1E;--app-d:#5BE0AE;--good:#31C88E;--warn:#E0A64B;--bad:#F26D6D;--muted:#69748A;--sh1:0 1px 2px rgba(0,0,0,.4);--sh2:0 10px 30px rgba(0,0,0,.55);}
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:var(--ui);background:var(--paper);color:var(--ink);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:var(--mono);font-size:.92em;}
+  h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.02em;}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:8px;}
+
+  .bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:13px;padding:14px 26px;background:color-mix(in srgb, var(--surface) 86%, transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
+  .mark{width:32px;height:32px;border-radius:9px;background:var(--accent);display:grid;place-items:center;color:#fff;flex:none;box-shadow:var(--sh1);}
+  .mark svg{width:18px;height:18px;}
+  .bt{font-weight:700;font-size:15px;}
+  .bs{font-size:11.5px;color:var(--ink-3);}
+  .sp{flex:1;}
+  .tbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink-2);width:36px;height:36px;border-radius:9px;display:grid;place-items:center;}
+  .tbtn:hover{background:var(--surface-2);} .tbtn svg{width:16px;height:16px;}
+
+  .wrap{max-width:1000px;margin:0 auto;padding:40px 26px 80px;}
+
+  /* hero */
+  .hero{margin-bottom:14px;}
+  .kicker{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--app-d);background:var(--app-s);border:1px solid color-mix(in srgb,var(--app) 40%,transparent);padding:5px 12px;border-radius:30px;margin-bottom:16px;}
+  h1.title{font-size:33px;line-height:1.12;font-weight:800;margin-bottom:12px;}
+  .sub{font-size:16px;color:var(--ink-2);max-width:660px;line-height:1.6;}
+  .sub b{color:var(--ink);font-weight:650;}
+
+  section{margin-top:52px;}
+  .eyebrow{display:flex;align-items:center;gap:11px;font-size:11px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px;}
+  .eyebrow::before{content:"";width:22px;height:2px;background:var(--accent);border-radius:2px;}
+  h2.sec{font-size:23px;font-weight:750;margin-bottom:6px;}
+  .lead{font-size:14px;color:var(--ink-2);margin-bottom:22px;max-width:640px;}
+
+  /* ===== architecture diagram (hand-built lanes) ===== */
+  .arch{display:flex;flex-direction:column;gap:0;}
+  .lane{--c:var(--hub);--cs:var(--hub-s);--cd:var(--hub-d);display:grid;grid-template-columns:150px 1fr;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh1);overflow:hidden;}
+  .lane.obj{--c:var(--obj);--cs:var(--obj-s);--cd:var(--obj-d);}
+  .lane.app{--c:var(--app);--cs:var(--app-s);--cd:var(--app-d);}
+  .lane .side{background:var(--cs);border-right:1px solid var(--line);padding:16px 16px;display:flex;flex-direction:column;justify-content:center;gap:3px;border-left:4px solid var(--c);}
+  .lane .side .st{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--cd);}
+  .lane .side .sn{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.25;}
+  .lane .side .sd{font-size:11px;color:var(--ink-3);}
+  .lane .cells{display:flex;flex-wrap:wrap;gap:8px;padding:15px 16px;align-content:center;}
+  .cell{display:inline-flex;flex-direction:column;gap:1px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;}
+  .cell .cn{font-family:var(--mono);font-size:12px;font-weight:650;color:var(--ink);}
+  .cell .cd{font-size:10.5px;color:var(--ink-3);}
+  .cell.key{background:var(--cs);border-color:color-mix(in srgb,var(--c) 45%,transparent);}
+  .cell.key .cn{color:var(--cd);}
+  .conn{display:flex;align-items:center;justify-content:center;gap:12px;padding:9px 0;}
+  .conn .cl{height:20px;width:0;border-left:2px dashed var(--line-2);}
+  .conn .lbl{font-size:11.5px;font-weight:600;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:30px;padding:4px 13px;display:inline-flex;align-items:center;gap:7px;box-shadow:var(--sh1);}
+  .conn .lbl svg{width:13px;height:13px;color:var(--accent);}
+  .conn .lbl.up svg{color:var(--app);}
+
+  /* ===== data flow (vertical pipeline) ===== */
+  .pipe{position:relative;padding-left:6px;}
+  .pstep{display:grid;grid-template-columns:34px 1fr;gap:16px;position:relative;padding-bottom:14px;}
+  .pstep:last-child{padding-bottom:0;}
+  .pstep .rail{display:flex;flex-direction:column;align-items:center;}
+  .pstep .dot{width:34px;height:34px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-weight:800;font-size:14px;flex:none;z-index:1;font-variant-numeric:tabular-nums;}
+  .pstep .stem{flex:1;width:2px;background:var(--line-2);margin:3px 0;border-radius:2px;}
+  .pstep:last-child .stem{display:none;}
+  .pcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh1);padding:14px 16px;margin-bottom:2px;}
+  .pcard .ph{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:5px;}
+  .pcard .pt{font-weight:700;font-size:14.5px;}
+  .pcard .pd{font-size:12.5px;color:var(--ink-2);line-height:1.55;}
+  .pcard .pd code{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:5px;}
+  .syspill{margin-left:auto;display:inline-flex;gap:5px;}
+  .sp2{font-size:10px;font-weight:700;letter-spacing:.02em;padding:3px 9px;border-radius:20px;white-space:nowrap;}
+  .sp2.hub{background:var(--hub-s);color:var(--hub-d);} .sp2.obj{background:var(--obj-s);color:var(--obj-d);} .sp2.app{background:var(--app-s);color:var(--app-d);}
+
+  /* ===== what's where matrix ===== */
+  .mx-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh1);}
+  table.mx{width:100%;border-collapse:collapse;min-width:660px;background:var(--surface);}
+  table.mx th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:800;padding:13px 14px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap;}
+  table.mx th.l{text-align:left;} table.mx th.home{color:var(--app-d);}
+  table.mx td{padding:12px 14px;border-bottom:1px solid var(--surface-2);font-size:13px;text-align:center;}
+  table.mx td.l{text-align:left;}
+  table.mx tr:last-child td{border-bottom:0;}
+  table.mx tbody tr:hover{background:var(--surface-2);}
+  .obj-n{font-family:var(--mono);font-weight:650;font-size:12.5px;}
+  .cn2{font-size:11px;color:var(--ink-3);display:block;margin-top:1px;}
+  .dot-y{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--good);}
+  .dot-p{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--warn);}
+  .dot-n{display:inline-block;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--line-2);background:transparent;}
+  .homecell{background:color-mix(in srgb,var(--app-s) 60%,transparent);font-weight:650;font-size:12px;color:var(--app-d);white-space:nowrap;}
+  tr.parked td{opacity:.5;}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin:14px 2px 0;font-size:12px;color:var(--ink-2);}
+  .legend span{display:inline-flex;align-items:center;gap:7px;}
+
+  /* build path */
+  .bp{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;}
+  @media(max-width:720px){.bp{grid-template-columns:1fr;}}
+  .bpcard{border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--sh1);padding:16px;border-top:3px solid var(--bpc);}
+  .bpcard .bph{font-weight:750;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:7px;color:var(--bpc);}
+  .bpcard .bpd{font-size:12.5px;color:var(--ink-2);}
+  .bpcard code{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);padding:1px 5px;border-radius:5px;}
+
+  .note{margin-top:22px;font-size:12.5px;color:var(--ink-2);background:var(--obj-s);border:1px solid color-mix(in srgb,var(--obj) 35%,transparent);border-radius:12px;padding:14px 16px;}
+  .note b{color:var(--obj-d);}
+  .note code{font-family:var(--mono);font-size:11px;background:var(--surface);border:1px solid var(--line);padding:1px 5px;border-radius:5px;}
+  .foot{max-width:1000px;margin:0 auto;padding:0 26px 56px;color:var(--ink-3);font-size:11.5px;line-height:1.6;}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+
+<div class="bar">
+  <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></svg></span>
+  <div><div class="bt">Copier Configurator — Data Model &amp; Flow</div><div class="bs">Quantum Business Solutions · HubSpot-native CPQ</div></div>
+  <span class="sp"></span>
+  <button class="tbtn" id="tg" aria-label="Toggle theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></svg></button>
+</div>
+
+<div class="wrap">
+  <div class="hero">
+    <span class="kicker">● V1 · Build → Price → Push → Sign</span>
+    <h1 class="title">One system to configure a copier deal, price it, and push it into HubSpot.</h1>
+    <p class="sub"><b>HubSpot is the system of record; the app is the engine.</b> The catalog and the signed deal live natively in HubSpot; the compatibility rules, pricing, leasing math, and proposal generation live in the app. Everything is colour-coded by where it lives.</p>
+  </div>
+
+  <!-- ARCHITECTURE -->
+  <section>
+    <div class="eyebrow">The data model</div>
+    <h2 class="sec">Three layers, and what lives in each</h2>
+    <p class="lead">Read top to bottom: HubSpot holds the catalog and the deal; a single custom object holds the rules; the app does the work.</p>
+
+    <div class="arch">
+      <div class="lane">
+        <div class="side"><span class="st">HubSpot · native</span><span class="sn">Catalog &amp; signed deal</span><span class="sd">system of record</span></div>
+        <div class="cells">
+          <span class="cell key"><span class="cn">product</span><span class="cd">price book + cpq flags</span></span>
+          <span class="cell key"><span class="cn">deal</span><span class="cd">writeback target</span></span>
+          <span class="cell key"><span class="cn">line_item</span><span class="cd">grouped by machine_group</span></span>
+          <span class="cell"><span class="cn">company · contact</span><span class="cd">account &amp; people</span></span>
+          <span class="cell"><span class="cn">quote</span><span class="cd">e-signature</span></span>
+        </div>
+      </div>
+
+      <div class="conn"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>catalog + rules sync down</span></div>
+
+      <div class="lane obj">
+        <div class="side"><span class="st">HubSpot · custom object</span><span class="sn">The rules store</span><span class="sd">exists in Imagine today</span></div>
+        <div class="cells">
+          <span class="cell key"><span class="cn">product_association</span><span class="cd">base ↔ related · rule_type · group · qty</span></span>
+        </div>
+      </div>
+
+      <div class="conn"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>evaluated by</span></div>
+
+      <div class="lane app">
+        <div class="side"><span class="st">App · Supabase</span><span class="sn">The engine</span><span class="sd">Marko's app — mostly built</span></div>
+        <div class="cells">
+          <span class="cell key"><span class="cn">quote_configurations</span><span class="cd">live build + terms</span></span>
+          <span class="cell"><span class="cn">quote_versions</span><span class="cd">good / better / best</span></span>
+          <span class="cell"><span class="cn">pricing_rules · tiers</span><span class="cd">markup off cost</span></span>
+          <span class="cell"><span class="cn">leasing rate sheets</span><span class="cd">monthly payment</span></span>
+          <span class="cell"><span class="cn">document_templates</span><span class="cd">proposal</span></span>
+          <span class="cell"><span class="cn">field_mappings · dealer_settings</span><span class="cd">writeback · multi-tenant</span></span>
+        </div>
+      </div>
+
+      <div class="conn"><span class="lbl up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>writes back: line items · amount · margin · lease</span></div>
+    </div>
+  </section>
+
+  <!-- DATA FLOW -->
+  <section>
+    <div class="eyebrow">The data flow</div>
+    <h2 class="sec">How it all works, step by step</h2>
+    <p class="lead">The v1 happy path — each step tagged with the system doing the work.</p>
+
+    <div class="pipe">
+      <div class="pstep"><div class="rail"><div class="dot">1</div><div class="stem"></div></div>
+        <div class="pcard"><div class="ph"><span class="pt">Catalog &amp; rules sync in</span><span class="syspill"><span class="sp2 hub">HubSpot</span><span class="sp2 obj">Custom obj</span><span class="sp2 app">App</span></span></div>
+          <div class="pd"><code>product</code> records (with <code>cpq_*</code> flags) and <code>product_association</code> rules sync into the app. This is what turns a flat product list into a configurator.</div></div></div>
+
+      <div class="pstep"><div class="rail"><div class="dot">2</div><div class="stem"></div></div>
+        <div class="pcard"><div class="ph"><span class="pt">Rep builds the deal</span><span class="syspill"><span class="sp2 app">App</span></span></div>
+          <div class="pd">Embedded on the HubSpot deal, the rep adds one or more machines → the rules surface only valid options → guided selling. Saves to <code>quote_configurations</code>, snapshots to <code>quote_versions</code>.</div></div></div>
+
+      <div class="pstep"><div class="rail"><div class="dot">3</div><div class="stem"></div></div>
+        <div class="pcard"><div class="ph"><span class="pt">Pricing &amp; leasing resolve</span><span class="syspill"><span class="sp2 app">App</span></span></div>
+          <div class="pd"><code>pricing_rules</code> / <code>tiers</code> set markup off floor cost; <code>lease_rate_sheets</code> compute the monthly payment; blended margin recalcs against target.</div></div></div>
+
+      <div class="pstep"><div class="rail"><div class="dot">4</div><div class="stem"></div></div>
+        <div class="pcard"><div class="ph"><span class="pt">Proposal generates</span><span class="syspill"><span class="sp2 app">App</span></span></div>
+          <div class="pd"><code>document_templates</code> + the configuration produce one consistent, branded proposal — the exact gap VanAusdall named.</div></div></div>
+
+      <div class="pstep"><div class="rail"><div class="dot">5</div><div class="stem"></div></div>
+        <div class="pcard"><div class="ph"><span class="pt">Push back to the Deal</span><span class="syspill"><span class="sp2 app">App</span><span class="sp2 hub">→ HubSpot</span></span></div>
+          <div class="pd">A clean set of <code>line_item</code>s grouped by machine (<code>machine_group</code> + <code>line_role</code> — line-item associations are read-only in HubSpot), plus <code>deal.amount</code>, margin, and lease fields. HubSpot is now the record.</div></div></div>
+
+      <div class="pstep"><div class="rail"><div class="dot">6</div></div>
+        <div class="pcard"><div class="ph"><span class="pt">Sign &amp; close</span><span class="syspill"><span class="sp2 hub">HubSpot</span></span></div>
+          <div class="pd">HubSpot Quote / PandaDoc / DocuSign e-sign → accepted → workflow advances the stage and fires downstream automation.</div></div></div>
+    </div>
+  </section>
+
+  <!-- WHAT'S WHERE -->
+  <section>
+    <div class="eyebrow">Reality check</div>
+    <h2 class="sec">What's where today</h2>
+    <p class="lead">Live from your portals + Marko's app. The last column is the v1 home we build toward.</p>
+    <div class="mx-wrap">
+      <table class="mx">
+        <thead><tr>
+          <th class="l">Object / capability</th><th>HubSpot<br>native</th><th>Imagine</th><th>Tascosa</th><th>Marko's app</th><th class="home">v1 home</th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="l"><span class="obj-n">company · contact · deal</span></td><td><span class="dot-y"></span></td><td><span class="dot-y"></span></td><td><span class="dot-y"></span></td><td><span class="dot-p"></span></td><td class="homecell">HubSpot</td></tr>
+          <tr><td class="l"><span class="obj-n">product</span><span class="cn2">price book</span></td><td><span class="dot-y"></span></td><td><span class="dot-y"></span><span class="cn2">+cpq, mfr/model</span></td><td><span class="dot-y"></span><span class="cn2">make/model/item#</span></td><td><span class="dot-p"></span><span class="cn2">syncs</span></td><td class="homecell">HubSpot</td></tr>
+          <tr><td class="l"><span class="obj-n">product cpq_*</span><span class="cn2">control flags</span></td><td><span class="dot-n"></span></td><td><span class="dot-y"></span><span class="cn2">6 flags</span></td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td class="homecell">HubSpot · standardize</td></tr>
+          <tr><td class="l"><span class="obj-n">line_item</span><span class="cn2">machine grouping</span></td><td><span class="dot-y"></span><span class="cn2">assoc read-only → use property</span></td><td><span class="dot-y"></span></td><td><span class="dot-y"></span></td><td><span class="dot-p"></span><span class="cn2">writes</span></td><td class="homecell">HubSpot · machine_group</td></tr>
+          <tr><td class="l"><span class="obj-n">product_association</span><span class="cn2">compatibility rules</span></td><td><span class="dot-p"></span><span class="cn2">custom obj</span></td><td><span class="dot-y"></span><span class="cn2">flat, no rules</span></td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td class="homecell">HubSpot obj → app</td></tr>
+          <tr><td class="l">configuration / working state</td><td><span class="dot-n"></span></td><td><span class="dot-p"></span><span class="cn2">QuoteIQHelper</span></td><td><span class="dot-n"></span></td><td><span class="dot-y"></span></td><td class="homecell">App</td></tr>
+          <tr><td class="l">quote versions / templates</td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td><span class="dot-y"></span></td><td class="homecell">App</td></tr>
+          <tr><td class="l">pricing rules / tiers</td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td><span class="dot-p"></span><span class="cn2">tiers ✓ · rules extend</span></td><td class="homecell">App</td></tr>
+          <tr><td class="l">leasing rate cards</td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td><span class="dot-y"></span></td><td class="homecell">App</td></tr>
+          <tr><td class="l">proposal / document generation</td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td><span class="dot-y"></span></td><td class="homecell">App</td></tr>
+          <tr><td class="l">writeback (line items + deal props)</td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td><span class="dot-n"></span></td><td><span class="dot-y"></span><span class="cn2">+ field mappings</span></td><td class="homecell">App → HubSpot</td></tr>
+          <tr><td class="l">e-signature</td><td><span class="dot-y"></span><span class="cn2">Quotes</span></td><td>—</td><td>—</td><td><span class="dot-p"></span><span class="cn2">PDF</span></td><td class="homecell">HubSpot / PandaDoc</td></tr>
+          <tr class="parked"><td class="l">equipment · lease · contract · competitive</td><td><span class="dot-p"></span></td><td><span class="dot-y"></span></td><td><span class="dot-y"></span></td><td><span class="dot-n"></span></td><td class="homecell" style="background:var(--surface-2);color:var(--ink-3)">parked · phase 2</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend"><span><span class="dot-y"></span> present</span><span><span class="dot-p"></span> partial</span><span><span class="dot-n"></span> absent</span></div>
+    <div class="note"><b>One decision baked in:</b> <code>product_association</code> is already a HubSpot custom object in Imagine, and you want to keep as much in HubSpot as possible — so the <b>rules stay a HubSpot custom object</b> (dealer-visible, editable, one per portal) and the app <b>syncs a copy to evaluate configurations fast</b>. HubSpot owns the data; the app owns the compute.</div>
+  </section>
+
+  <!-- BUILD PATH -->
+  <section>
+    <div class="eyebrow">The work</div>
+    <h2 class="sec">Build path</h2>
+    <p class="lead">Most of the engine already exists. The configurator and its rules are the real build.</p>
+    <div class="bp">
+      <div class="bpcard" style="--bpc:var(--good)"><div class="bph">● Already built</div><div class="bpd">In Marko's app: OAuth + read/write, line-item writeback, quote versions &amp; templates, leasing engine, pricing tiers, document generation, field mappings, roles, multi-tenant settings.</div></div>
+      <div class="bpcard" style="--bpc:var(--warn)"><div class="bph">● Extend</div><div class="bpd">Standardize <code>cpq_*</code> flags + rep/dealer cost on the price book; add <code>pricing_rules</code> (markup criteria, effective dates).</div></div>
+      <div class="bpcard" style="--bpc:var(--bad)"><div class="bph">● Net-new</div><div class="bpd">Rule fields on <code>product_association</code> + the guided-selling <b>configurator UI</b> and its rules engine. The core of v1.</div></div>
+    </div>
+  </section>
+</div>
+
+<div class="foot">Sourced from live inspection of the Imagine Technology (43784504) and Tascosa (244111826) portals, the KeyPoint Quote IQ demo, and Marko's Quantum Document Management app. Field lists representative, not final — properties are the next conversation. Current-state objects exist in both portals but are out of v1 scope.</div>
+
+<script>
+  document.getElementById('tg').onclick=()=>{ const c=document.documentElement.getAttribute('data-theme'); const n=c==='dark'?'light':c==='light'?'dark':(matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark'); document.documentElement.setAttribute('data-theme',n); };
+</script>

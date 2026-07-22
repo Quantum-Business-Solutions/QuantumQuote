@@ -1,0 +1,31 @@
+{
+  "_comment": "Custom HubSpot Product properties for QuantumQuote. POST each to /crm/v3/properties/products. groupName 'productinformation'.",
+  "objectType": "products",
+  "groupName": "productinformation",
+  "properties": [
+    { "name": "manufacturer", "label": "Manufacturer", "type": "string", "fieldType": "text" },
+    { "name": "model", "label": "Model", "type": "string", "fieldType": "text" },
+    { "name": "rep_floor_cost", "label": "Rep Floor Cost", "type": "number", "fieldType": "number" },
+    { "name": "product_category", "label": "Product Category", "type": "enumeration", "fieldType": "select",
+      "options": [
+        { "label": "Machine", "value": "Machine", "displayOrder": 0 },
+        { "label": "Accessory", "value": "Accessory", "displayOrder": 1 },
+        { "label": "Software", "value": "Software", "displayOrder": 2 },
+        { "label": "Service", "value": "Service", "displayOrder": 3 }
+      ] },
+    { "name": "cpq_active", "label": "CPQ Active", "type": "enumeration", "fieldType": "booleancheckbox",
+      "options": [ { "label": "Yes", "value": "true", "displayOrder": 0 }, { "label": "No", "value": "false", "displayOrder": 1 } ] },
+    { "name": "cpq_color_mode", "label": "CPQ Color Mode", "type": "enumeration", "fieldType": "select",
+      "options": [ { "label": "Color", "value": "Color", "displayOrder": 0 }, { "label": "Mono", "value": "Mono", "displayOrder": 1 }, { "label": "N/A", "value": "NA", "displayOrder": 2 } ] },
+    { "name": "cpq_available_for_lease", "label": "CPQ Available for Lease", "type": "enumeration", "fieldType": "booleancheckbox",
+      "options": [ { "label": "Yes", "value": "true", "displayOrder": 0 }, { "label": "No", "value": "false", "displayOrder": 1 } ] },
+    { "name": "cpq_environment", "label": "CPQ Environment", "type": "enumeration", "fieldType": "select",
+      "options": [
+        { "label": "A3", "value": "A3", "displayOrder": 0 },
+        { "label": "A4", "value": "A4", "displayOrder": 1 },
+        { "label": "Production", "value": "Production", "displayOrder": 2 },
+        { "label": "Wide Format", "value": "WideFormat", "displayOrder": 3 },
+        { "label": "N/A", "value": "NA", "displayOrder": 4 }
+      ] }
+  ]
+}
