@@ -161,6 +161,14 @@
   .disabledblock { opacity:.4; pointer-events:none; }
   .hint { font-size:11px; color:var(--ink-3); }
   .cpc-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:4px; }
+  .svcwrap { padding:6px 18px 12px; display:flex; flex-direction:column; gap:9px; }
+  .svcrow { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
+  .svcrow .svlbl { font-size:12px; font-weight:650; width:46px; }
+  .svcrow .svf { display:flex; flex-direction:column; gap:3px; font-size:9px; color:var(--ink-3); text-transform:uppercase; letter-spacing:.03em; font-weight:700; }
+  .svcrow .svf input { width:84px; }
+  .svcrow .svamt { margin-left:auto; font-weight:600; font-size:12.5px; color:var(--ink-2); font-family:var(--mono); }
+  .svcbase { display:flex; justify-content:space-between; align-items:baseline; border-top:1px dashed var(--line-2); padding-top:8px; font-size:12px; color:var(--ink-2); }
+  .svcbase b { font-size:14px; color:var(--ink); font-family:var(--mono); }
 
   .rail { position:sticky; top:78px; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--sh-2); overflow:hidden; }
   .rail .rhead { padding:14px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:9px; }
@@ -300,16 +308,26 @@
           <div class="field lease-only">
             <label>Lease type</label>
             <select id="leaseType"><option value="fmv">Fair Market Value (FMV)</option><option value="dollar">$1.00 buyout</option></select>
-            <span class="hint">Financed across all machines in the quote.</span>
           </div>
           <div class="field">
-            <label>Managed print (cost-per-click)</label>
-            <div class="segbtns" id="cpcSeg"><button data-v="on" class="on">Include CPC</button><button data-v="off">Hardware only</button></div>
-            <span class="hint">Recurring service revenue billed on meter reads.</span>
+            <label>Service agreement</label>
+            <div class="segbtns" id="svcSeg"><button data-v="on" class="on">Include</button><button data-v="off">Hardware only</button></div>
+          </div>
+          <div class="field svc-only">
+            <label>Billing model</label>
+            <div class="segbtns" id="svcModelSeg"><button data-v="base" class="on">Base + overage</button><button data-v="cpc">Cost-per-click</button></div>
+          </div>
+          <div class="field svc-only">
+            <label>Meter</label>
+            <div class="segbtns" id="svcScopeSeg"><button data-v="per" class="on">Per machine</button><button data-v="pooled">Pooled</button></div>
+          </div>
+          <div class="field svc-only">
+            <label>Meter collection</label>
+            <select id="meterMethod"><option>FMAudit</option><option>PrintFleet</option><option>Manual Entry</option></select>
           </div>
         </div>
-        <div class="cpc-only" id="cpcBlock" style="margin-top:14px;">
-          <span class="hint">Set each machine's monthly page volume in its <b>Monthly print volume</b> section as you configure it — CPC revenue is calculated per machine and pooled across the fleet here.</span>
+        <div class="svc-only" id="svcNote" style="margin-top:12px;">
+          <span class="hint">Set each machine's volumes + rates in its <b>Service agreement</b> section as you configure it. The monthly base is auto-sized to the included volume; overage bills pages beyond it. Toggle <b>Pooled</b> to blend the meter across the fleet.</span>
         </div>
       </div>
     </section>
@@ -400,7 +418,7 @@ const OPTIONS = [
   { id:'install',cat:'Service', name:'Install & Network Setup Pak', sku:'INSTALL-PAK', price:486, compat:['c3','c4','m3','m4'], flag:'req' },
   { id:'maint',  cat:'Service', name:'Extended Maintenance — Add\'l Year', sku:'MNTV4X-ADDYR', price:410, compat:['c3','c4','m3','m4'], flag:'rec' },
 ];
-const CPC = { monoRate:0.0089, monoCost:0.0040, colorRate:0.0499, colorCost:0.0280 };
+const SVC = { rateMono:0.0089, costMono:0.0040, ovgMono:0.0120, rateColor:0.0499, costColor:0.0280, ovgColor:0.0600 };
 const DEFVOL = { c3:{m:4000,c:3000}, c4:{m:1500,c:800}, m4:{m:2000,c:0}, m3:{m:25000,c:0} };
 const LEASE_FACTOR = { 36:{ fmv:0.0303, dollar:0.0325 }, 48:{ fmv:0.0242, dollar:0.0262 }, 60:{ fmv:0.0205, dollar:0.0223 } };
 const TARGET_MARGIN = 0.35;
@@ -408,7 +426,7 @@ const CATLABEL = { Accessory:'Finishing & feeding', Software:'Software & capture
 const CATORDER = ['Accessory','Software','Service'];
 
 let UID = 0;
-const state = { builds:[], active:null, acq:'lease', term:60, leaseType:'fmv', cpc:true };
+const state = { builds:[], active:null, acq:'lease', term:60, leaseType:'fmv', service:true, svcModel:'base', svcScope:'per', meterMethod:'FMAudit' };
 
 const $ = s => document.querySelector(s);
 const money = n => '$' + Math.round(n).toLocaleString('en-US');
@@ -441,7 +459,7 @@ function renderMachines(){
 
 function addMachine(id){
   const dv = DEFVOL[machineById(id).cls] || {m:3000,c:1500};
-  const build = { id:'b'+(++UID), machineId:id, sel:{}, qty:1, volMono:dv.m, volColor:dv.c };
+  const build = { id:'b'+(++UID), machineId:id, sel:{}, qty:1, volMono:dv.m, volColor:dv.c, rateMono:SVC.rateMono, rateColor:SVC.rateColor, ovgMono:SVC.ovgMono, ovgColor:SVC.ovgColor };
   compatOptions(build).forEach(o=>{ if(o.flag==='req'||o.flag==='rec') build.sel[o.id]=1; });
   state.builds.push(build);
   state.active = build.id;
@@ -510,10 +528,17 @@ function renderOptions(){
     });
     html+='</div>';
   });
-  if(state.cpc){
-    html += `<div class="optgroup"><div class="og-head"><span class="catdot" style="background:var(--cat-svc)"></span><span class="t">Monthly print volume · this machine</span><span class="c">drives CPC</span></div>
-      <div class="orow" style="cursor:default"><span class="info"><span class="onm">Mono pages / mo</span><span class="osku">bills $0.0089/pg · cost $0.0040</span></span><input class="txt mono" type="number" min="0" step="500" value="${b.volMono}" data-vol="mono" style="width:96px"></div>
-      <div class="orow" style="cursor:default"><span class="info"><span class="onm">Color pages / mo</span><span class="osku">bills $0.0499/pg · cost $0.0280</span></span><input class="txt mono" type="number" min="0" step="500" value="${b.volColor}" data-vol="color" style="width:96px"></div></div>`;
+  if(state.service){
+    const bm = b.volMono*b.rateMono, bc = b.volColor*b.rateColor;
+    const svrow = (lbl,which)=>{ const vol=which==='mono'?b.volMono:b.volColor, rate=which==='mono'?b.rateMono:b.rateColor, ovg=which==='mono'?b.ovgMono:b.ovgColor;
+      return `<div class="svcrow"><span class="svlbl">${lbl}</span>
+        <label class="svf"><span>Vol/mo</span><input class="txt mono" type="number" min="0" step="500" value="${vol}" data-svc="${which}:vol"></label>
+        <label class="svf"><span>Rate/pg</span><input class="txt mono" type="number" min="0" step="0.001" value="${rate.toFixed(4)}" data-svc="${which}:rate"></label>
+        <label class="svf"><span>Overage/pg</span><input class="txt mono" type="number" min="0" step="0.001" value="${ovg.toFixed(4)}" data-svc="${which}:ovg"></label>
+        <span class="svamt">${money2(vol*rate)}/mo</span></div>`; };
+    html += `<div class="optgroup"><div class="og-head"><span class="catdot" style="background:var(--cat-svc)"></span><span class="t">Service agreement · this machine</span><span class="c">${state.svcModel==='base'?'base + overage':'cost-per-click'}</span></div>
+      <div class="svcwrap">${svrow('Mono','mono')}${svrow('Color','color')}
+        <div class="svcbase"><span>Monthly base rate — per unit (auto)</span><b>${money2(bm+bc)}/mo</b></div></div></div>`;
   }
   $('#optgroups').innerHTML = html;
   document.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>toggleOpt(el.dataset.toggle));
@@ -523,8 +548,12 @@ function renderOptions(){
     bd.sel[id]=Math.max(1,(bd.sel[id]||1)+d); renderOptions(); recompute(); });
   document.querySelectorAll('[data-q]').forEach(inp=>{ inp.onclick=e=>e.stopPropagation();
     inp.onchange=()=>{ activeBuild().sel[inp.dataset.q]=Math.max(1,parseInt(inp.value,10)||1); renderOptions(); recompute(); }; });
-  document.querySelectorAll('[data-vol]').forEach(inp=>{ inp.onclick=e=>e.stopPropagation();
-    inp.onchange=()=>{ const bd=activeBuild(); const v=Math.max(0,parseInt(inp.value,10)||0); if(inp.dataset.vol==='mono')bd.volMono=v; else bd.volColor=v; recompute(); }; });
+  document.querySelectorAll('[data-svc]').forEach(inp=>{ inp.onclick=e=>e.stopPropagation();
+    inp.onchange=()=>{ const bd=activeBuild(); const [which,field]=inp.dataset.svc.split(':'); const v=Math.max(0,parseFloat(inp.value)||0);
+      if(field==='vol'){ if(which==='mono')bd.volMono=Math.round(v); else bd.volColor=Math.round(v); }
+      else if(field==='rate'){ if(which==='mono')bd.rateMono=v; else bd.rateColor=v; }
+      else { if(which==='mono')bd.ovgMono=v; else bd.ovgColor=v; }
+      renderOptions(); recompute(); }; });
 }
 function toggleOpt(id){
   const b = activeBuild(); const o = OPTIONS.find(x=>x.id===id);
@@ -548,9 +577,9 @@ function calcBuild(b){
   let sell=0,cost=0,hw=0,acc=0,sw=0,svc=0;
   lines.forEach(l=>{ const ext=l.price*l.qty; sell+=ext; cost+=ext*COSTR[l.cat];
     if(l.cat==='Hardware')hw+=ext; else if(l.cat==='Accessory')acc+=ext; else if(l.cat==='Software')sw+=ext; else svc+=ext; });
-  const cpcRev = state.cpc ? ((b.volMono*CPC.monoRate + b.volColor*CPC.colorRate)*U) : 0;
-  const cpcCost = state.cpc ? ((b.volMono*CPC.monoCost + b.volColor*CPC.colorCost)*U) : 0;
-  return {machine:m, units:U, lines, sell, cost, hw, acc, sw, svc, cpcRev, cpcCost, volMono:b.volMono*U, volColor:b.volColor*U};
+  const svcRev = state.service ? ((b.volMono*b.rateMono + b.volColor*b.rateColor)*U) : 0;
+  const svcCost = state.service ? ((b.volMono*SVC.costMono + b.volColor*SVC.costColor)*U) : 0;
+  return {machine:m, units:U, lines, sell, cost, hw, acc, sw, svc, svcRev, svcCost, volMono:b.volMono*U, volColor:b.volColor*U, rateMono:b.rateMono, rateColor:b.rateColor, ovgMono:b.ovgMono, ovgColor:b.ovgColor};
 }
 function calcAll(){
   const perBuild = state.builds.map(calcBuild);
@@ -558,10 +587,11 @@ function calcAll(){
   perBuild.forEach(c=>{ hw+=c.hw; acc+=c.acc; sw+=c.sw; svc+=c.svc; sell+=c.sell; cost+=c.cost; });
   const equip = hw+acc+sw;
   let pay=0; if(state.acq==='lease' && equip>0) pay = equip*LEASE_FACTOR[state.term][state.leaseType];
-  let cpcRev=0,cpcCost=0,volM=0,volC=0;
-  if(state.cpc){ perBuild.forEach(c=>{ cpcRev+=c.cpcRev; cpcCost+=c.cpcCost; volM+=c.volMono; volC+=c.volColor; }); }
+  let svcRev=0,svcCost=0,volM=0,volC=0,revM=0,revC=0;
+  if(state.service){ perBuild.forEach(c=>{ svcRev+=c.svcRev; svcCost+=c.svcCost; volM+=c.volMono; volC+=c.volColor; revM+=c.volMono*c.rateMono; revC+=c.volColor*c.rateColor; }); }
+  const blendMono = volM>0 ? revM/volM : 0, blendColor = volC>0 ? revC/volC : 0;
   const equipGP = sell>0 ? (sell-cost)/sell : 0;
-  return {perBuild,hw,acc,sw,svc,equip,dealAmount:equip,sell,cost,equipGP,pay,cpcRev,cpcCost,volM,volC};
+  return {perBuild,hw,acc,sw,svc,equip,dealAmount:equip,sell,cost,equipGP,pay,svcRev,svcCost,volM,volC,blendMono,blendColor};
 }
 
 function recompute(){
@@ -571,14 +601,17 @@ function recompute(){
     $('#totals').style.display='none'; $('#mmeter').style.display='none'; $('#genBtn').disabled=true; $('#lineCount').textContent='Empty'; return; }
 
   let totalLines=0;
-  rl.innerHTML = c.perBuild.map((cb,i)=>{
+  const groups = c.perBuild.map((cb,i)=>{
     totalLines += cb.lines.length;
     const rows = cb.lines.slice(1).map(l=>`<div class="rline"><span class="rc" style="background:${cvar(l.cat)}"></span><span class="rn">${l.name}<div class="rq mono">${l.sku}${l.qty>1?' · ×'+l.qty:''}</div></span><span class="rp num">${money(l.price*l.qty)}</span></div>`).join('');
+    const svcLine = (state.service && state.svcScope==='per') ? `<div class="rline"><span class="rc" style="background:var(--cat-svc)"></span><span class="rn">Service agreement<div class="rq mono">${Math.round(cb.volMono).toLocaleString('en-US')} mono / ${Math.round(cb.volColor).toLocaleString('en-US')} color pg·mo</div></span><span class="rp num">${money2(cb.svcRev)}<span style="font-size:9px;color:var(--ink-3)">/mo</span></span></div>` : '';
     const dup = state.builds.filter(x=>x.machineId===cb.machine.id);
     const idx = dup.indexOf(state.builds[i])+1;
     return `<div class="rgroup"><div class="rgh"><span class="rgn">${shortName(cb.machine)}${dup.length>1?` #${idx}`:''} <span class="rgi">${cb.units>1?'×'+cb.units+' units':'machine '+(i+1)}</span></span><span class="rgp num">${money(cb.sell)}</span></div>
-      <div class="rline"><span class="rc" style="background:${cvar('Hardware')}"></span><span class="rn">${cb.machine.name}<div class="rq mono">${cb.machine.sku} · base unit${cb.units>1?' · ×'+cb.units:''}</div></span><span class="rp num">${money(cb.machine.price*cb.units)}</span></div>${rows}</div>`;
+      <div class="rline"><span class="rc" style="background:${cvar('Hardware')}"></span><span class="rn">${cb.machine.name}<div class="rq mono">${cb.machine.sku} · base unit${cb.units>1?' · ×'+cb.units:''}</div></span><span class="rp num">${money(cb.machine.price*cb.units)}</span></div>${rows}${svcLine}</div>`;
   }).join('');
+  const pooledSvc = (state.service && state.svcScope==='pooled') ? `<div class="rgroup rfleet"><div class="rgh"><span class="rgn">Fleet service · pooled <span class="rgi">blended meter</span></span><span class="rgp num">${money2(c.svcRev)}<span style="font-size:9px;color:var(--ink-3)">/mo</span></span></div><div class="rline"><span class="rc" style="background:var(--cat-svc)"></span><span class="rn">Pooled meter<div class="rq mono">${Math.round(c.volM).toLocaleString('en-US')} mono @ ${money2(c.blendMono)} · ${Math.round(c.volC).toLocaleString('en-US')} color @ ${money2(c.blendColor)}</div></span><span class="rp num"></span></div></div>` : '';
+  rl.innerHTML = groups + pooledSvc;
 
   $('#lineCount').textContent = `${state.builds.length} machine${state.builds.length>1?'s':''} · ${totalLines} lines`;
   $('#totals').style.display=''; $('#mmeter').style.display=''; $('#genBtn').disabled=false;
@@ -588,7 +621,7 @@ function recompute(){
   const payRow=$('#payRow'), cpcRow=$('#cpcRow');
   if(state.acq==='lease'){ payRow.style.display=''; $('#payLabel').textContent=`Monthly lease · ${state.term}mo ${state.leaseType==='fmv'?'FMV':'$1'}`; $('#tPay').innerHTML=money2(c.pay)+'<span class="sub">/mo</span>'; }
   else payRow.style.display='none';
-  if(state.cpc){ cpcRow.style.display=''; $('#tCpc').innerHTML=money2(c.cpcRev)+'<span class="sub">/mo</span>'; } else cpcRow.style.display='none';
+  if(state.service){ cpcRow.style.display=''; document.querySelector('#cpcRow .tl').textContent = (state.svcModel==='base'?'Monthly service (base)':'Monthly service (CPC)')+(state.svcScope==='pooled'?' · pooled':''); $('#tCpc').innerHTML=money2(c.svcRev)+'<span class="sub">/mo</span>'; } else cpcRow.style.display='none';
 
   const pct = c.equipGP*100; $('#marginPct').textContent=pct.toFixed(1)+'%';
   const fill=$('#marginFill'); fill.style.width=Math.max(3,Math.min(100,pct))+'%';
@@ -605,8 +638,11 @@ function recompute(){
 function bindSeg(sel, fn){ document.querySelectorAll(`${sel} button`).forEach(b=>b.onclick=()=>{ document.querySelectorAll(`${sel} button`).forEach(x=>x.classList.remove('on')); b.classList.add('on'); fn(b.dataset.v); }); }
 bindSeg('#acqSeg', v=>{ state.acq=v; document.querySelectorAll('.lease-only').forEach(e=>e.classList.toggle('disabledblock', v!=='lease')); recompute(); });
 bindSeg('#termSeg', v=>{ state.term=parseInt(v,10); recompute(); });
-bindSeg('#cpcSeg', v=>{ state.cpc=(v==='on'); $('#cpcBlock').classList.toggle('disabledblock', !state.cpc); renderOptions(); recompute(); });
+bindSeg('#svcSeg', v=>{ state.service=(v==='on'); document.querySelectorAll('.svc-only').forEach(e=>e.classList.toggle('disabledblock', !state.service)); renderOptions(); recompute(); });
+bindSeg('#svcModelSeg', v=>{ state.svcModel=v; renderOptions(); recompute(); });
+bindSeg('#svcScopeSeg', v=>{ state.svcScope=v; recompute(); });
 $('#leaseType').onchange=e=>{ state.leaseType=e.target.value; recompute(); };
+$('#meterMethod').onchange=e=>{ state.meterMethod=e.target.value; };
 
 /* ---- proposal ---- */
 function openProposal(){
@@ -623,7 +659,7 @@ function openProposal(){
   const summ = `<div class="summ">
     <div class="box"><div class="k">Deal amount (equipment)</div><div class="v">${money(c.dealAmount)}</div><div class="kv2">${state.builds.reduce((s,b)=>s+(b.qty||1),0)} machines · ex install/buyout</div></div>
     ${state.acq==='lease'?`<div class="box"><div class="k">Monthly payment</div><div class="v">${money2(c.pay)}</div><div class="kv2">${acqLine}</div></div>`:`<div class="box"><div class="k">One-time total</div><div class="v">${money(c.sell)}</div><div class="kv2">cash purchase</div></div>`}
-    ${state.cpc?`<div class="box"><div class="k">Monthly CPC service</div><div class="v">${money2(c.cpcRev)}</div><div class="kv2">GP ${money2(c.cpcRev-c.cpcCost)}/mo</div></div>`:''}
+    ${state.service?`<div class="box"><div class="k">Monthly service</div><div class="v">${money2(c.svcRev)}</div><div class="kv2">${state.svcModel==='base'?'base + overage':'cost-per-click'} · GP ${money2(c.svcRev-c.svcCost)}/mo</div></div>`:''}
     <div class="box"><div class="k">Blended equipment margin</div><div class="v">${(c.equipGP*100).toFixed(1)}%</div><div class="kv2">GP ${money(c.sell-c.cost)}</div></div></div>`;
   const totalLines = c.perBuild.reduce((s,cb)=>s+cb.lines.length,0);
   const wb = `<div class="wb"><div class="wbh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M12 2v14M6 8l6-6 6 6"/></svg>Writes back to the HubSpot Deal</div><ul>
@@ -631,7 +667,7 @@ function openProposal(){
     <li><strong>${state.builds.length}</strong> machine line items + ${totalLines-state.builds.length} option line items — grouped via <code>machine_group</code> + <code>line_role</code> (line-item associations are read-only in HubSpot)</li>
     <li><code>margin_percent</code> ${(c.equipGP*100).toFixed(1)}% · <code>margin_dollars</code> ${money(c.sell-c.cost)}</li>
     ${state.acq==='lease'?`<li><code>lease_type</code> ${state.leaseType==='fmv'?'FMV':'$1 buyout'} · <code>lease_term</code> ${state.term} · <code>lease_payment</code> ${money2(c.pay)} (financed across fleet)</li>`:''}
-    ${state.cpc?`<li><code>cpc_rate</code> color ${money2(CPC.colorRate)} / mono ${money2(CPC.monoRate)} · ${(c.volM+c.volC).toLocaleString('en-US')} pages/mo pooled across ${state.builds.length} machines</li>`:''}</ul></div>`;
+    ${state.service?`<li>service agreement — <code>${state.svcModel==='base'?'base_rate':'cpc'}</code> ${money2(c.svcRev)}/mo · meter ${state.meterMethod} · ${state.svcScope==='pooled'?'pooled/blended':'per-machine'} · ${(c.volM+c.volC).toLocaleString('en-US')} pg/mo</li>`:''}</ul></div>`;
   $('#propBody').innerHTML = machineBlocks + summ + wb + `<div style="display:flex;gap:8px;margin-top:18px"><button class="btn primary" id="pushBtn" style="flex:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Push to HubSpot Deal</button><button class="btn ghost" id="cancelProp" style="flex:none;padding:11px 16px">Close</button></div>`;
   $('#overlay').classList.add('show');
   $('#pushBtn').onclick=()=>{ $('#overlay').classList.remove('show'); toast(`${state.builds.length}-machine quote synced to HubSpot Deal`,'ok'); };
@@ -643,7 +679,7 @@ $('#closeProp').onclick=closeProposal;
 $('#overlay').onclick=e=>{ if(e.target===$('#overlay')) closeProposal(); };
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeProposal(); });
 
-$('#resetBtn').onclick=()=>{ state.builds=[]; state.active=null; state.acq='lease'; state.term=60; state.leaseType='fmv'; state.cpc=true;
+$('#resetBtn').onclick=()=>{ state.builds=[]; state.active=null; state.acq='lease'; state.term=60; state.leaseType='fmv'; state.service=true; state.svcModel='base'; state.svcScope='per';
   $('#pnlOptions').style.display='none'; $('#pnlTerms').style.display='none'; renderMachines(); recompute(); $('#pnlMachines').scrollIntoView({behavior:'smooth',block:'start'}); };
 
 let toastT;
