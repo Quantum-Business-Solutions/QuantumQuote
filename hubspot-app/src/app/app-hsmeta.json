@@ -14,37 +14,23 @@
       "type": "oauth",
       "requiredScopes": [
         "oauth",
-        "e-commerce",
-        "crm.objects.deals.read",
-        "crm.objects.deals.write",
-        "crm.schemas.deals.read",
-        "crm.schemas.deals.write",
-        "crm.objects.line_items.read",
-        "crm.objects.line_items.write",
-        "crm.objects.custom.read",
-        "crm.objects.custom.write",
-        "crm.schemas.custom.read",
-        "crm.schemas.custom.write",
         "crm.objects.contacts.read",
         "crm.objects.companies.read",
-        "crm.objects.owners.read",
-        "settings.users.read"
+        "crm.objects.deals.read"
       ],
-      "optionalScopes": ["files"],
+      "optionalScopes": [
+        "crm.objects.deals.write",
+        "crm.objects.contacts.write",
+        "crm.objects.companies.write"
+      ],
       "conditionallyRequiredScopes": [],
       "redirectUrls": [
-        "https://REPLACE_WITH_QUANTUMQUOTE_SUPABASE_REF.supabase.co/functions/v1/hubspot-oauth-callback"
+        "https://connector-gateway.lovable.dev/api/v1/app-users/oauth2/callback"
       ]
     },
     "permittedUrls": {
-      "fetch": [
-        "https://api.hubapi.com",
-        "https://REPLACE_WITH_QUANTUMQUOTE_SUPABASE_REF.supabase.co"
-      ],
-      "iframe": [
-        "https://REPLACE_WITH_QUANTUMQUOTE_SUPABASE_REF.supabase.co",
-        "https://REPLACE_WITH_QUANTUMQUOTE_LOVABLE_APP.lovable.app"
-      ],
+      "fetch": [],
+      "iframe": [],
       "img": []
     }
   }
