@@ -1,0 +1,73 @@
+leasing_company,lease_program,min_amount,max_amount,term_months,rate_factor
+GreatAmerica,FMV,0,9999,36,0.0305
+GreatAmerica,FMV,10000,24999,36,0.0299
+GreatAmerica,FMV,25000,49999,36,0.0294
+GreatAmerica,FMV,50000,250000,36,0.0289
+GreatAmerica,FMV,0,9999,48,0.0242
+GreatAmerica,FMV,10000,24999,48,0.0236
+GreatAmerica,FMV,25000,49999,48,0.0231
+GreatAmerica,FMV,50000,250000,48,0.0226
+GreatAmerica,FMV,0,9999,60,0.0201
+GreatAmerica,FMV,10000,24999,60,0.0195
+GreatAmerica,FMV,25000,49999,60,0.019
+GreatAmerica,FMV,50000,250000,60,0.0185
+GreatAmerica,$1 Buyout,0,9999,36,0.0327
+GreatAmerica,$1 Buyout,10000,24999,36,0.0321
+GreatAmerica,$1 Buyout,25000,49999,36,0.0316
+GreatAmerica,$1 Buyout,50000,250000,36,0.0311
+GreatAmerica,$1 Buyout,0,9999,48,0.0263
+GreatAmerica,$1 Buyout,10000,24999,48,0.0257
+GreatAmerica,$1 Buyout,25000,49999,48,0.0252
+GreatAmerica,$1 Buyout,50000,250000,48,0.0247
+GreatAmerica,$1 Buyout,0,9999,60,0.022
+GreatAmerica,$1 Buyout,10000,24999,60,0.0214
+GreatAmerica,$1 Buyout,25000,49999,60,0.0209
+GreatAmerica,$1 Buyout,50000,250000,60,0.0204
+DLL,FMV,0,9999,36,0.03065
+DLL,FMV,10000,24999,36,0.03005
+DLL,FMV,25000,49999,36,0.02955
+DLL,FMV,50000,250000,36,0.02905
+DLL,FMV,0,9999,48,0.02435
+DLL,FMV,10000,24999,48,0.02375
+DLL,FMV,25000,49999,48,0.02325
+DLL,FMV,50000,250000,48,0.02275
+DLL,FMV,0,9999,60,0.02025
+DLL,FMV,10000,24999,60,0.01965
+DLL,FMV,25000,49999,60,0.01915
+DLL,FMV,50000,250000,60,0.01865
+DLL,$1 Buyout,0,9999,36,0.03285
+DLL,$1 Buyout,10000,24999,36,0.03225
+DLL,$1 Buyout,25000,49999,36,0.03175
+DLL,$1 Buyout,50000,250000,36,0.03125
+DLL,$1 Buyout,0,9999,48,0.02645
+DLL,$1 Buyout,10000,24999,48,0.02585
+DLL,$1 Buyout,25000,49999,48,0.02535
+DLL,$1 Buyout,50000,250000,48,0.02485
+DLL,$1 Buyout,0,9999,60,0.02215
+DLL,$1 Buyout,10000,24999,60,0.02155
+DLL,$1 Buyout,25000,49999,60,0.02105
+DLL,$1 Buyout,50000,250000,60,0.02055
+Wells Fargo Vendor Finance,FMV,0,9999,36,0.0304
+Wells Fargo Vendor Finance,FMV,10000,24999,36,0.0298
+Wells Fargo Vendor Finance,FMV,25000,49999,36,0.0293
+Wells Fargo Vendor Finance,FMV,50000,250000,36,0.0288
+Wells Fargo Vendor Finance,FMV,0,9999,48,0.0241
+Wells Fargo Vendor Finance,FMV,10000,24999,48,0.0235
+Wells Fargo Vendor Finance,FMV,25000,49999,48,0.023
+Wells Fargo Vendor Finance,FMV,50000,250000,48,0.0225
+Wells Fargo Vendor Finance,FMV,0,9999,60,0.02
+Wells Fargo Vendor Finance,FMV,10000,24999,60,0.0194
+Wells Fargo Vendor Finance,FMV,25000,49999,60,0.0189
+Wells Fargo Vendor Finance,FMV,50000,250000,60,0.0184
+Wells Fargo Vendor Finance,$1 Buyout,0,9999,36,0.0326
+Wells Fargo Vendor Finance,$1 Buyout,10000,24999,36,0.032
+Wells Fargo Vendor Finance,$1 Buyout,25000,49999,36,0.0315
+Wells Fargo Vendor Finance,$1 Buyout,50000,250000,36,0.031
+Wells Fargo Vendor Finance,$1 Buyout,0,9999,48,0.0262
+Wells Fargo Vendor Finance,$1 Buyout,10000,24999,48,0.0256
+Wells Fargo Vendor Finance,$1 Buyout,25000,49999,48,0.0251
+Wells Fargo Vendor Finance,$1 Buyout,50000,250000,48,0.0246
+Wells Fargo Vendor Finance,$1 Buyout,0,9999,60,0.0219
+Wells Fargo Vendor Finance,$1 Buyout,10000,24999,60,0.0213
+Wells Fargo Vendor Finance,$1 Buyout,25000,49999,60,0.0208
+Wells Fargo Vendor Finance,$1 Buyout,50000,250000,60,0.0203
