@@ -1,0 +1,10 @@
+{
+  "uid": "quantumquote-configurator-card",
+  "type": "card",
+  "config": {
+    "name": "QuantumQuote Configurator",
+    "location": "crm.record.tab",
+    "entrypoint": "/app/extensions/QuantumQuoteCard.jsx",
+    "objectTypes": ["deals"]
+  }
+}

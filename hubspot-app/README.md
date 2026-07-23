@@ -1,72 +1,79 @@
-# QuantumQuote — HubSpot public app (new-platform project)
+# QuantumQuote — HubSpot public app (Developer Platform project)
 
-The deployable HubSpot **developer app** for QuantumQuote, modeled on Marko's
-`QuantumLeasingHub` / `DocCommand` app config. This is the OAuth app dealers
-install so the configurator can read/write their real HubSpot deal.
+The deployable HubSpot **developer app** for QuantumQuote — the OAuth app
+dealers install so the configurator can read/write their real HubSpot deal.
+Layout + conventions match the proven Sierra project (platform `2026.03`) and
+the OAuth config matches Marko's `QuantumLeasingHub`.
 
-> **Why this is separate from the web app.** The configurator UI + Supabase
-> edge functions live in the Lovable repo (`quotecommand-0958c73e`). This
-> project is only the HubSpot *app definition* (OAuth config + the CRM card
-> that iframes to the web app). Same split Marko uses.
+> **Separate from the web app on purpose.** The configurator UI + Supabase edge
+> functions live in the Lovable repo (`quotecommand-0958c73e`). This project is
+> only the HubSpot *app definition* (OAuth config + the CRM card that iframes
+> the web app onto the Deal).
 
-## Layout
+## Layout (matches Sierra)
 ```
-hsproject.json                              platformVersion 2025.2
-src/app/quantumquote-app-hsmeta.json        OAuth config: scopes, redirect, permittedUrls
-src/app/app-logo.png                        (add a logo)
-src/app/cards/quantumquote-card-hsmeta.json card: Deal record tab
-src/app/cards/QuantumQuoteCard.tsx          React UI extension → Iframe to the app
+hubspot-app/
+├── hsproject.json                             # name · srcDir · platformVersion 2026.03
+└── src/app/
+    ├── app-hsmeta.json                        # OAuth config: scopes · redirect · permittedUrls
+    ├── app-logo.png                           # ADD a logo file
+    └── extensions/
+        ├── quantumquote-card.hsmeta.json      # card on the Deal record tab
+        ├── QuantumQuoteCard.jsx               # React UI extension → Iframe to the app
+        └── package.json                       # REQUIRED — see gotcha below
 ```
 
-## Fill in three blanks first
-1. **`REPLACE_WITH_QUANTUMQUOTE_SUPABASE_REF`** (3 spots in the app config) —
+## Fill three blanks before uploading
+1. **`REPLACE_WITH_QUANTUMQUOTE_SUPABASE_REF`** (3 spots in `app-hsmeta.json`) —
    QuantumQuote's Supabase project ref (Supabase → Project Settings → API →
-   Project URL). This makes the redirect URL
+   Project URL). Redirect becomes
    `https://<ref>.supabase.co/functions/v1/hubspot-oauth-callback`.
-2. **`REPLACE_WITH_QUANTUMQUOTE_LOVABLE_APP`** (app config `permittedUrls.iframe`
-   and `QuantumQuoteCard.tsx`) — the published Lovable URL for `quotecommand`.
-3. After the app is created, put its **Client ID / Secret** into that Supabase
-   project's env as `HUBSPOT_CLIENT_ID` / `HUBSPOT_CLIENT_SECRET`.
+2. **`REPLACE_WITH_QUANTUMQUOTE_LOVABLE_APP`** (`app-hsmeta.json`
+   `permittedUrls.iframe` + `QuantumQuoteCard.jsx`) — the published Lovable URL
+   for `quotecommand`.
+3. After first upload, copy the app's **Client ID / Secret** (Auth tab in
+   project details) into that Supabase project's env as `HUBSPOT_CLIENT_ID` /
+   `HUBSPOT_CLIENT_SECRET`.
 
-## Deploy (the CLI step — needs your developer-account login)
-The safest route, since the exact 2025.2 project/card conventions must match
-what your account already accepts: **copy your proven Sierra (or
-QuantumLeasingHub) project folder, drop these QuantumQuote files in, adjust the
-iframe URL, and upload.** That guarantees the shell format is one your account
-has already deployed.
-
+## Deploy — the CLI step (your developer-account login)
 ```sh
-# one-time, on your/Marko's machine (opens a browser to auth the dev account)
-npm i -g @hubspot/cli
-hs init                       # mints a personal access key for the dev account
+npm install -g @hubspot/cli@latest      # v7.6.0+
+hs account auth --pak                    # paste a Personal Access Key; name the account
+hs account list                          # confirm it points at the QBS developer account
 
-# from the project folder
-hs project upload             # or: hs project dev  (live preview while editing)
+cd hubspot-app
+hs project lint --install-missing-deps   # catches the missing package.json class of bug
+hs project upload --forceCreate          # builds + auto-deploys
+hs project info                          # shows build #, app ID, auth type
 ```
+Then: **Client ID/Secret → Supabase env** (step 3 above), and connect a portal
+via the app's **OAuth install URL** (Client ID + redirect + scopes). Authorizing
+hits our `hubspot-oauth-callback` and stores the encrypted tokens — after that
+the configurator round-trips against the real deal.
 
-Then in the developer account: grab the **Client ID/Secret** → set them in the
-QuantumQuote Supabase env, and use the app's **install link** to connect the
-demo portal (47404459). After that the configurator round-trips against the
-real deal.
+> **oauth vs. static (why we differ from Sierra).** Sierra used
+> `auth.type: "static"` + `distribution: "private"` because its card was just an
+> iframe to a public page — no backend token exchange. QuantumQuote reads/writes
+> the CRM through Supabase using the **OAuth authorization-code flow**, so it
+> must be `auth.type: "oauth"`. That also means you connect portals via the
+> **install URL**, not `hs project install-app` (which is the static-private path).
 
-## Scopes — why each
-- `e-commerce` — read the Products price book (the catalog). *(This is the one
-  Marko's leasing app didn't need; the configurator does.)*
-- `crm.objects.deals.read/write` + `crm.schemas.deals.read/write` — read the
-  deal, write line items/rollups, and create the `cpq_*` deal properties.
-- `crm.objects.line_items.read/write` — the grouped quote line items.
-- `crm.objects.custom.read/write` + `crm.schemas.custom.read/write` — the
-  `product_association` rules object (create + read/write rules).
-- `crm.objects.contacts.read`, `crm.objects.companies.read`,
-  `crm.objects.owners.read` — deal context + approval-task assignment + analytics.
-- `settings.users.read` — the roles manager.
-- `files` (optional) — attaching documents / uploading product images later.
+## The gotcha that cost Sierra the most time
+Every extension subfolder needs its **own `package.json`** naming its runtime
+deps, or the build **silently skips the card** as "not a real component."
+That's why `extensions/package.json` exists here. `hs project lint
+--install-missing-deps` surfaces it before upload.
 
-Changing scopes after dealers install forces them to re-authorize, so lock
-this list before sharing the install link.
+## Fallback if the native card won't surface
+Sierra's remaining friction was 100% HubSpot-UI-side — getting the card to
+appear via **Customize → Card library → Card types → App** on the record. If
+that stalls, the guaranteed fallback is a plain Deal property holding a link to
+the configurator (created in one API call), plus the in-app **"Configure Quote"**
+button already in the Document Hub header. So there's always a working entry
+point to the deal even before the native card is surfaced.
 
-## Demo portal (47404459) — already provisioned via PAT
-Data model is live and demo-ready: 13 `cpq_*` deal properties, 8 product
-properties (`rep_floor_cost`, `manufacturer`, `model`, `product_category`, CPQ
-flags), 109 products, and the `product_association` object (`2-66268498`) with
-25 compatibility rules.
+## Demo portal (47404459) — data model already provisioned (via PAT)
+Live and demo-ready: 13 `cpq_*` deal properties, 8 product properties
+(`rep_floor_cost`, `manufacturer`, `model`, `product_category`, CPQ flags), 109
+products, and the `product_association` object (`2-66268498`) with 25
+compatibility rules.
