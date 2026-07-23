@@ -1,0 +1,22 @@
+{
+  "_comment": "App-side service (CPC) rate card, keyed by model-family/category group. The configurator derives each machine's group from its class/environment/color and applies these as the default committed volume + base rate + overage (rep can still override per machine). Only the FINAL computed service agreement pushes back to the HubSpot deal (cpq_service_monthly_total + service line item). Rates are billed $/page; cost is dealer $/page for margin.",
+  "version": "2026-07",
+  "groups": [
+    { "group": "A4_MONO_DESKTOP",      "label": "A4 Mono — Desktop",         "color": false, "incl_mono": 2000,  "incl_color": 0,     "rate_mono": 0.0110, "rate_color": 0,      "ovg_mono": 0.0130, "ovg_color": 0,      "cost_mono": 0.0045, "cost_color": 0 },
+    { "group": "A4_COLOR_DESKTOP",     "label": "A4 Color — Desktop",        "color": true,  "incl_mono": 1500,  "incl_color": 800,   "rate_mono": 0.0110, "rate_color": 0.0650, "ovg_mono": 0.0135, "ovg_color": 0.0750, "cost_mono": 0.0045, "cost_color": 0.0320 },
+    { "group": "A3_MONO_WORKGROUP",    "label": "A3 Mono — Workgroup",       "color": false, "incl_mono": 5000,  "incl_color": 0,     "rate_mono": 0.0078, "rate_color": 0,      "ovg_mono": 0.0095, "ovg_color": 0,      "cost_mono": 0.0038, "cost_color": 0 },
+    { "group": "A3_COLOR_WORKGROUP",   "label": "A3 Color — Workgroup",      "color": true,  "incl_mono": 4000,  "incl_color": 3000,  "rate_mono": 0.0080, "rate_color": 0.0490, "ovg_mono": 0.0100, "ovg_color": 0.0600, "cost_mono": 0.0040, "cost_color": 0.0280 },
+    { "group": "A3_COLOR_PRODUCTION",  "label": "A3 Color — Production",     "color": true,  "incl_mono": 20000, "incl_color": 15000, "rate_mono": 0.0060, "rate_color": 0.0380, "ovg_mono": 0.0075, "ovg_color": 0.0450, "cost_mono": 0.0032, "cost_color": 0.0230 },
+    { "group": "A3_MONO_PRODUCTION",   "label": "A3 Mono — Production",      "color": false, "incl_mono": 50000, "incl_color": 0,     "rate_mono": 0.0045, "rate_color": 0,      "ovg_mono": 0.0060, "ovg_color": 0,      "cost_mono": 0.0022, "cost_color": 0 }
+  ],
+  "machine_to_group": {
+    "_comment": "How the configurator maps a machine to a rate group. Uses the class (cls) it already computes, else derives from cpq_environment + cpq_color_mode.",
+    "by_cls": { "c3": "A3_COLOR_WORKGROUP", "c4": "A4_COLOR_DESKTOP", "m3": "A3_MONO_PRODUCTION", "m4": "A4_MONO_DESKTOP" },
+    "by_environment_color": {
+      "Production+Color": "A3_COLOR_PRODUCTION", "Production+Mono": "A3_MONO_PRODUCTION",
+      "A3+Color": "A3_COLOR_WORKGROUP", "A3+Mono": "A3_MONO_WORKGROUP",
+      "A4+Color": "A4_COLOR_DESKTOP", "A4+Mono": "A4_MONO_DESKTOP"
+    },
+    "fallback": "A3_COLOR_WORKGROUP"
+  }
+}
