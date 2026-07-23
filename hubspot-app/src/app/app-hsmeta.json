@@ -30,7 +30,7 @@
     },
     "permittedUrls": {
       "fetch": [],
-      "iframe": [],
+      "iframe": ["https://REPLACE_WITH_QUANTUMQUOTE_LOVABLE_APP.lovable.app"],
       "img": []
     }
   }
