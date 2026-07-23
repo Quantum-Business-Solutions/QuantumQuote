@@ -1,0 +1,14 @@
+{
+  "type": "card",
+  "data": {
+    "title": "QuantumQuote Configurator",
+    "uid": "quantumquote_configurator_card",
+    "location": "crm.record.tab",
+    "objectTypes": [
+      { "name": "deals" }
+    ],
+    "module": {
+      "file": "QuantumQuoteCard.tsx"
+    }
+  }
+}

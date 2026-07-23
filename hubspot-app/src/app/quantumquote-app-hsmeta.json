@@ -1,0 +1,53 @@
+{
+  "config": {
+    "auth": {
+      "type": "oauth",
+      "redirectUrls": [
+        "https://REPLACE_WITH_QUANTUMQUOTE_SUPABASE_REF.supabase.co/functions/v1/hubspot-oauth-callback"
+      ],
+      "requiredScopes": [
+        "oauth",
+        "e-commerce",
+        "crm.objects.deals.read",
+        "crm.objects.deals.write",
+        "crm.schemas.deals.read",
+        "crm.schemas.deals.write",
+        "crm.objects.line_items.read",
+        "crm.objects.line_items.write",
+        "crm.objects.custom.read",
+        "crm.objects.custom.write",
+        "crm.schemas.custom.read",
+        "crm.schemas.custom.write",
+        "crm.objects.contacts.read",
+        "crm.objects.companies.read",
+        "crm.objects.owners.read",
+        "settings.users.read"
+      ],
+      "optionalScopes": [
+        "files"
+      ],
+      "conditionallyRequiredScopes": []
+    },
+    "logo": "/app/app-logo.png",
+    "name": "QuantumQuote",
+    "support": {
+      "supportEmail": "shawn@thequantumleap.business"
+    },
+    "description": "HubSpot-native CPQ for office-equipment dealers: configure a copier fleet with compatibility rules and live margins, price the lease and service agreement, and push it back to the deal as grouped line items.",
+    "isUserLevel": false,
+    "distribution": "MARKETPLACE",
+    "permittedUrls": {
+      "img": [],
+      "fetch": [
+        "https://api.hubapi.com",
+        "https://REPLACE_WITH_QUANTUMQUOTE_SUPABASE_REF.supabase.co"
+      ],
+      "iframe": [
+        "https://REPLACE_WITH_QUANTUMQUOTE_SUPABASE_REF.supabase.co",
+        "https://REPLACE_WITH_QUANTUMQUOTE_LOVABLE_APP.lovable.app"
+      ]
+    }
+  },
+  "uid": "QuantumQuote",
+  "type": "app"
+}
